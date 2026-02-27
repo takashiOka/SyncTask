@@ -100,6 +100,39 @@ public class RedmineService
         return new RedmineTimeEntryBulkResult(successCount, errors);
     }
 
+    public async Task<Dictionary<int, bool>> GetIssueClosedStatusMapAsync(
+        RedmineSettings settings,
+        IEnumerable<int> issueIds,
+        CancellationToken cancellationToken = default)
+    {
+        var issueIdList = issueIds
+            .Distinct()
+            .ToList();
+
+        var statusMap = new Dictionary<int, bool>();
+
+        foreach (var issueId in issueIdList)
+        {
+            using var request = BuildRequest(settings, $"issues/{issueId}.json");
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                continue;
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<RedmineIssueResponse>(cancellationToken: cancellationToken);
+            if (payload?.Issue?.Status is null)
+            {
+                continue;
+            }
+
+            statusMap[issueId] = payload.Issue.Status.IsClosed;
+        }
+
+        return statusMap;
+    }
+
     private async Task RegisterSpentTimeAsync(
         RedmineSettings settings,
         RedmineTimeEntryDraft draft,
@@ -205,6 +238,11 @@ public sealed class RedmineIssuesResponse
     public int Limit { get; set; }
 }
 
+public sealed class RedmineIssueResponse
+{
+    public RedmineIssue? Issue { get; set; }
+}
+
 public sealed class RedmineIssue
 {
     public int Id { get; set; }
@@ -212,6 +250,18 @@ public sealed class RedmineIssue
     public string Subject { get; set; } = string.Empty;
 
     public RedmineNamedValue? Tracker { get; set; }
+
+    public RedmineIssueStatus? Status { get; set; }
+}
+
+public sealed class RedmineIssueStatus
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("is_closed")]
+    public bool IsClosed { get; set; }
 }
 
 public sealed class RedmineNamedValue

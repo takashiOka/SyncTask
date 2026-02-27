@@ -23,6 +23,10 @@ public class WorkLogEntry
 
     public int? RedmineTaskIssueId { get; set; }
 
+    public bool? RedmineTaskIsClosed { get; set; }
+
+    public string TaskStatusLabel { get; set; } = string.Empty;
+
     public decimal PlannedHours { get; set; }
 
     public decimal ActualHours { get; set; }

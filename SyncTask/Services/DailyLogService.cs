@@ -59,6 +59,16 @@ public class DailyLogService
         {
             await database.ExecuteAsync("ALTER TABLE WorkLogEntry ADD COLUMN RedmineTaskIssueId INTEGER NULL");
         }
+
+        if (!columnNames.Contains("RedmineTaskIsClosed"))
+        {
+            await database.ExecuteAsync("ALTER TABLE WorkLogEntry ADD COLUMN RedmineTaskIsClosed INTEGER NULL");
+        }
+
+        if (!columnNames.Contains("TaskStatusLabel"))
+        {
+            await database.ExecuteAsync("ALTER TABLE WorkLogEntry ADD COLUMN TaskStatusLabel TEXT NULL");
+        }
     }
 
     public async Task<WorkLog> GetOrCreateDailyLogAsync(DateTime workDate)

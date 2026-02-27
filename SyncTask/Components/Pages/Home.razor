@@ -244,6 +244,7 @@
 
         var selectedStory = redmineStories.FirstOrDefault(x => x.Id == selectedStoryIssueId);
         var selectedTask = redmineTasks.FirstOrDefault(x => x.Id == selectedTaskIssueId);
+        var taskStatusLabel = MapTaskStatusLabel(selectedTask?.Status?.IsClosed);
 
         var newEntry = new WorkLogEntry
         {
@@ -254,6 +255,8 @@
             RedmineStoryIssueId = selectedStory?.Id,
             Task = selectedTask is null ? string.Empty : $"#{selectedTask.Id} {selectedTask.Subject}",
             RedmineTaskIssueId = selectedTask?.Id,
+            RedmineTaskIsClosed = selectedTask?.Status?.IsClosed,
+            TaskStatusLabel = taskStatusLabel,
             PlannedHours = plannedHours,
             ActualHours = actualHours
         };
@@ -284,9 +287,69 @@
 
     private async Task GenerateMailBodyFromTemplateAsync()
     {
+        await RefreshTaskStatusesFromRedmineAsync();
+
         var templateText = await LoadMailBodyTemplateAsync();
         generatedMailBody = BuildMailBody(templateText, workDate, startTime, endTime, entries);
         redmineStatusMessage = "勤務報告メール本文を生成しました。";
+    }
+
+    private async Task RefreshTaskStatusesFromRedmineAsync()
+    {
+        var taskIssueIds = entries
+            .Where(entry => entry.RedmineTaskIssueId.HasValue)
+            .Select(entry => entry.RedmineTaskIssueId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (taskIssueIds.Count == 0)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(redmineSettings.BaseUrl) || string.IsNullOrWhiteSpace(redmineSettings.ApiKey))
+        {
+            return;
+        }
+
+        try
+        {
+            var statusMap = await RedmineService.GetIssueClosedStatusMapAsync(redmineSettings, taskIssueIds);
+            var hasChanges = false;
+
+            foreach (var entry in entries)
+            {
+                if (!entry.RedmineTaskIssueId.HasValue)
+                {
+                    continue;
+                }
+
+                if (!statusMap.TryGetValue(entry.RedmineTaskIssueId.Value, out var isClosed))
+                {
+                    continue;
+                }
+
+                var newStatusLabel = MapTaskStatusLabel(isClosed);
+                if (entry.RedmineTaskIsClosed == isClosed && string.Equals(entry.TaskStatusLabel, newStatusLabel, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                entry.RedmineTaskIsClosed = isClosed;
+                entry.TaskStatusLabel = newStatusLabel;
+                await DailyLogService.SaveEntryAsync(entry);
+                hasChanges = true;
+            }
+
+            if (hasChanges && currentLog is not null)
+            {
+                entries = await DailyLogService.GetEntriesAsync(currentLog.Id);
+            }
+        }
+        catch
+        {
+            // ステータス同期失敗時は保存済み状態で本文生成を継続
+        }
     }
 
     private async Task CopyMailBodyAsync()
@@ -602,7 +665,8 @@
                     var taskKey = string.Concat(entry.Story, "|", entry.Task);
                     if (seenTaskLines.Add(taskKey))
                     {
-                        contentBuilder.Append("    ・").AppendLine(entry.Task);
+                        var taskLine = BuildTaskLineWithStatus(entry.Task, entry.TaskStatusLabel, entry.RedmineTaskIsClosed);
+                        contentBuilder.Append("    ・").AppendLine(taskLine);
                         hasTicketLine = true;
                     }
                 }
@@ -620,5 +684,29 @@
     private static string FormatHours(decimal hours)
     {
         return hours.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private static string MapTaskStatusLabel(bool? isClosed)
+    {
+        if (!isClosed.HasValue)
+        {
+            return string.Empty;
+        }
+
+        return isClosed.Value ? "[完了]" : "[継続]";
+    }
+
+    private static string BuildTaskLineWithStatus(string taskName, string? taskStatusLabel, bool? isClosed)
+    {
+        var normalizedLabel = string.IsNullOrWhiteSpace(taskStatusLabel)
+            ? MapTaskStatusLabel(isClosed)
+            : taskStatusLabel;
+
+        if (string.IsNullOrWhiteSpace(normalizedLabel))
+        {
+            return taskName;
+        }
+
+        return $"{taskName} {normalizedLabel}";
     }
 }
