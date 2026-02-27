@@ -35,11 +35,11 @@
                             <th>プロジェクト</th>
                             <th>ストーリー</th>
                             <th>タスク</th>
-                            <th>開始時間</th>
-                            <th>予定</th>
-                            <th>終了予定</th>
-                            <th>実終了</th>
-                            <th>実工数</th>
+                            <th>開始</th>
+                            <th>工数(予)</th>
+                            <th>終了(予)</th>
+                            <th>終了(実)</th>
+                            <th>工数(実)</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -70,7 +70,7 @@
                                         <option value="">ストーリーを選択</option>
                                         @foreach (var issue in stories)
                                         {
-                                            <option value="@issue.Id">#@issue.Id @issue.Subject</option>
+                                            <option value="@issue.Id" title="@issue.Id @issue.Subject">#@issue.Id @issue.Subject</option>
                                         }
                                     </select>
                                 </td>
@@ -82,12 +82,13 @@
                                         <option value="">タスクを選択</option>
                                         @foreach (var issue in tasks)
                                         {
-                                            <option value="@issue.Id">#@issue.Id @issue.Subject</option>
+                                            <option value="@issue.Id" title="@issue.Id @issue.Subject">#@issue.Id @issue.Subject</option>
                                         }
                                     </select>
                                 </td>
                                 <td>
                                     <input type="time"
+                                           step="900"
                                            value="@ToInputTime(entry.StartTime)"
                                            @oninput="args => OnGridStartTimeChanged(entry, args)"
                                            @onblur="async _ => await SaveGridRowAsync(entry)"
@@ -101,14 +102,23 @@
                                            @oninput="args => OnGridPlannedHoursChanged(entry, args)"
                                            @onblur="async _ => await SaveGridRowAsync(entry)" />
                                 </td>
-                                <td class="daily-grid-cell--readonly">@FormatTime(entry.PlannedEndTime)</td>
+                                <td class="daily-grid-cell--readonly">
+                                    <input type="text"
+                                           value="@FormatTime(entry.PlannedEndTime)"
+                                           disabled="true" />
+                                </td>
                                 <td>
                                     <input type="time"
                                            value="@ToInputTime(entry.ActualEndTime)"
                                            @oninput="args => OnGridActualEndTimeChanged(entry, args)"
                                            @onblur="async _ => await SaveGridRowAsync(entry)" />
                                 </td>
-                                <td class="daily-grid-cell--readonly">@FormatHours(entry.ActualHours)</td>
+                                <td class="daily-grid-cell--readonly">
+                                    <input type="text"
+                                           value="@FormatHours(entry.ActualHours)"
+                                           disabled="true"/>
+                                    
+                                </td>
                                 <td>
                                     @if (!IsEntryEmpty(entry))
                                     {

@@ -1,0 +1,218 @@
+.daily-page__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.daily-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #1e293b;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.daily-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.daily-card--full {
+  grid-column: 1 / -1;
+}
+
+.daily-card__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.75rem;
+}
+
+.daily-log__table-wrap {
+  margin-top: 0.85rem;
+  overflow-x: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+}
+
+.daily-log__table {
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.daily-log__table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(241, 245, 249, 0.9);
+  color: #334155;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+.daily-log__table th,
+.daily-log__table td {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  vertical-align: middle;
+}
+
+.daily-log__table th {
+  padding: 0.75rem 0.4rem;
+  text-align: center;
+}
+
+.daily-log__table td {
+  padding: 0.2rem 0.2rem;
+}
+
+/* --- 各列の幅指定 --- */
+
+/* 1. プロジェクト / 2. ストーリー / 3. タスク (可変列) */
+.daily-log__table th:nth-child(1),
+.daily-log__table td:nth-child(1),
+.daily-log__table th:nth-child(2),
+.daily-log__table td:nth-child(2),
+.daily-log__table th:nth-child(3),
+.daily-log__table td:nth-child(3) {
+  min-width: 180px; /* 極端に潰れないように最小幅を確保 */
+}
+
+/* 4. 開始時間 / 6. 終了予定 / 7. 実終了 */
+.daily-log__table th:nth-child(4),
+.daily-log__table td:nth-child(4),
+.daily-log__table th:nth-child(6),
+.daily-log__table td:nth-child(6),
+.daily-log__table th:nth-child(7),
+.daily-log__table td:nth-child(7) {
+  width: 75px;
+  min-width: 75px;
+}
+
+/* 5. 予定 / 8. 実工数 (固定幅) */
+.daily-log__table th:nth-child(5),
+.daily-log__table td:nth-child(5),
+.daily-log__table th:nth-child(8),
+.daily-log__table td:nth-child(8) {
+  width: 60px;
+  min-width: 60px;
+}
+
+/* 9. 削除ボタン列 */
+.daily-log__table th:nth-child(9),
+.daily-log__table td:nth-child(9) {
+  width: 50px;
+  text-align: center;
+}
+
+/* セレクトボックスの文字切れ対策 */
+.daily-log__table select {
+  text-overflow: ellipsis; /* 長い場合に「...」を表示 */
+  white-space: nowrap;
+  overflow: hidden;
+  /* appearance: none; ブラウザ標準の矢印を消して制御しやすくする場合 */
+}
+
+.daily-log__table tbody tr:nth-child(even) {
+  background: rgba(248, 250, 252, 0.6);
+}
+
+.daily-log__table tbody tr:hover {
+  background: rgba(219, 234, 254, 0.28);
+}
+
+.daily-log__table input,
+.daily-log__table select {
+  width: 100%;
+  min-height: 2.1rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  background: rgba(255, 255, 255, 0.36);
+  color: #0f172a;
+  padding: 0 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px) saturate(1.08);
+  -webkit-backdrop-filter: blur(10px) saturate(1.08);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.daily-log__table input:focus,
+.daily-log__table select:focus {
+  border-color: rgba(37, 99, 235, 0.46);
+  background: rgba(255, 255, 255, 0.48);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  outline: none;
+}
+
+.daily-log__table input:disabled,
+.daily-log__table select:disabled {
+  color: #64748b;
+}
+
+.daily-log__table select:focus {
+  width: auto; /* 選択中だけ中身に合わせて広がる */
+  min-width: 100%;
+  position: relative;
+  z-index: 1000;
+}
+
+.daily-grid-cell--readonly {
+  color: #334155;
+  font-weight: 600;
+  font-size: 0.8rem;
+  display: table-cell;
+}
+
+.daily-log__mail-preview {
+  width: 100%;
+  min-height: 22rem;
+  margin-top: 0.5rem;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  color: #0f172a;
+  padding: 1rem 1.1rem;
+  resize: vertical;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  font-size: 0.95rem;
+  font-family: "MS Gothic", "ＭＳ ゴシック", monospace;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.daily-log__mail-preview:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.4);
+  outline-offset: 2px;
+}
+
+.daily-log__mail-empty {
+  margin-top: 0.45rem;
+  border: 1px dashed rgba(148, 163, 184, 0.5);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  color: #475569;
+  padding: 1rem;
+}
+
+@media (max-width: 900px) {
+  .daily-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-page__badges {
+    justify-content: flex-start;
+  }
+}
