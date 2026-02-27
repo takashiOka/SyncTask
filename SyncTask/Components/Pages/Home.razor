@@ -26,24 +26,6 @@
     }
 
     <div class="daily-grid">
-        <section class="daily-card glass-card">
-            <h2>Redmine設定</h2>
-            <div class="daily-log__entry daily-log__entry--redmine-fields">
-                <InputText @bind-Value="redmineSettings.BaseUrl" placeholder="Redmine URL (例: https://redmine.example.com)" />
-            </div>
-            <div class="daily-log__entry daily-log__entry--redmine-fields">
-                <InputText @bind-Value="redmineSettings.ApiKey" placeholder="APIキー" />
-            </div>
-            <div class="daily-log__entry daily-log__entry--redmine-trackers">
-                <InputText @bind-Value="redmineSettings.StoryTrackerNames" placeholder="ストーリー用トラッカー名（カンマ区切り）" />
-                <InputText @bind-Value="redmineSettings.TaskTrackerNames" placeholder="タスク用トラッカー名（カンマ区切り）" />
-            </div>
-            <div class="daily-log__entry daily-log__entry--actions">
-                <button class="btn btn--primary" @onclick="SaveRedmineSettingsAsync" disabled="@isLoadingRedmine">設定保存</button>
-                <button class="btn btn--ghost" @onclick="LoadProjectsAsync" disabled="@isLoadingRedmine">Redmine読込</button>
-            </div>
-        </section>
-
         <section class="daily-card glass-card daily-card--full">
             <h2>作業入力</h2>
             <div class="daily-log__table-wrap">
@@ -179,7 +161,7 @@
     private DateTime workDate = DateTime.Today;
     private WorkLog? currentLog;
     private List<WorkLogEntry> entries = new();
-    private RedmineSettings redmineSettings = new();
+    private SyncTask.Data.RedmineSettings redmineSettings = new();
     private List<RedmineProject> redmineProjects = new();
     private readonly Dictionary<int, RedmineIssueSplitResult> projectIssueCache = new();
     private bool isLoadingRedmine;
@@ -190,6 +172,7 @@
     {
         redmineSettings = await DailyLogService.GetOrCreateRedmineSettingsAsync();
         await LoadAsync();
+        await LoadProjectsAsync();
     }
 
     private async Task OnWorkDateChanged(ChangeEventArgs args)
@@ -340,12 +323,6 @@
         {
             redmineStatusMessage = $"メール作成画面を開けませんでした: {ex.Message}";
         }
-    }
-
-    private async Task SaveRedmineSettingsAsync()
-    {
-        await DailyLogService.SaveRedmineSettingsAsync(redmineSettings);
-        redmineStatusMessage = "Redmine設定を保存しました。";
     }
 
     private async Task RegisterSpentTimeToRedmineAsync()

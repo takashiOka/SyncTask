@@ -1,0 +1,72 @@
+@page "/redmine-settings"
+@inject DailyLogService DailyLogService
+@inject RedmineService RedmineService
+
+<div class="daily-page">
+    <section class="daily-page__hero glass-card">
+        <div>
+            <h1>Redmine設定</h1>
+            <p class="daily-page__subtitle">接続先とトラッカー定義を管理します</p>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="daily-status glass-card">@statusMessage</div>
+    }
+
+    <section class="daily-card glass-card">
+        <div class="daily-log__entry daily-log__entry--redmine-fields">
+            <InputText @bind-Value="settings.BaseUrl" placeholder="Redmine URL (例: https://redmine.example.com)" />
+        </div>
+        <div class="daily-log__entry daily-log__entry--redmine-fields">
+            <InputText @bind-Value="settings.ApiKey" placeholder="APIキー" />
+        </div>
+        <div class="daily-log__entry daily-log__entry--redmine-trackers">
+            <InputText @bind-Value="settings.StoryTrackerNames" placeholder="ストーリー用トラッカー名（カンマ区切り）" />
+            <InputText @bind-Value="settings.TaskTrackerNames" placeholder="タスク用トラッカー名（カンマ区切り）" />
+        </div>
+        <div class="daily-log__entry daily-log__entry--actions">
+            <button class="btn btn--primary" @onclick="SaveAsync" disabled="@isLoading">設定保存</button>
+            <button class="btn btn--ghost" @onclick="TestLoadProjectsAsync" disabled="@isLoading">Redmine読込テスト</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    private SyncTask.Data.RedmineSettings settings = new();
+    private bool isLoading;
+    private string? statusMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        settings = await DailyLogService.GetOrCreateRedmineSettingsAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        await DailyLogService.SaveRedmineSettingsAsync(settings);
+        statusMessage = "Redmine設定を保存しました。";
+    }
+
+    private async Task TestLoadProjectsAsync()
+    {
+        isLoading = true;
+        statusMessage = null;
+
+        try
+        {
+            await DailyLogService.SaveRedmineSettingsAsync(settings);
+            var projects = await RedmineService.GetProjectsAsync(settings);
+            statusMessage = $"プロジェクトを {projects.Count} 件取得しました。";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Redmine取得に失敗しました: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

@@ -1,3 +1,186 @@
 ﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
 
-@Body
+<div class="app-shell @GetShellClass()" style="--sidebar-width:@SidebarWidth;">
+	<aside class="app-sidebar @GetSidebarClass()" aria-hidden="@(sidebarMode == SidebarMode.AutoHide && !isSidebarOpen)">
+		<div class="app-sidebar__top">
+			<div class="app-sidebar__title-wrap">
+				<div class="app-sidebar__title">SyncTask</div>
+			</div>
+			<div class="app-sidebar__actions">
+				<button class="app-sidebar__pin @(sidebarMode == SidebarMode.Fixed ? "active" : string.Empty)"
+						@onclick="ToggleSidebarModeAsync"
+						title="@(sidebarMode == SidebarMode.Fixed ? "固定表示中" : "自動隠すモード")">
+					📌
+				</button>
+				@if (sidebarMode == SidebarMode.AutoHide)
+				{
+					<button class="app-sidebar__close" @onclick="CloseSidebar" title="サイドバーを閉じる">✕</button>
+				}
+			</div>
+		</div>
+
+		<nav class="app-sidebar__nav">
+			<NavLink href="/" Match="NavLinkMatch.All" ActiveClass="active" class="app-sidebar__link" title="デイリー管理" aria-label="デイリー管理ページへ移動" @onclick="OnNavigateAsync">
+				<span class="app-sidebar__link-row">
+					<span class="app-sidebar__icon" aria-hidden="true"><i class="bi bi-house"></i></span>
+					<span class="app-sidebar__text">デイリー管理</span>
+				</span>
+			</NavLink>
+			<NavLink href="/redmine-settings" ActiveClass="active" class="app-sidebar__link" title="Redmine設定" aria-label="Redmine設定ページへ移動" @onclick="OnNavigateAsync">
+				<span class="app-sidebar__link-row">
+					<span class="app-sidebar__icon" aria-hidden="true"><i class="bi bi-sliders"></i></span>
+					<span class="app-sidebar__text">Redmine設定</span>
+				</span>
+			</NavLink>
+		</nav>
+	</aside>
+
+	@if (sidebarMode == SidebarMode.AutoHide && isSidebarOpen)
+	{
+		<button class="app-sidebar__backdrop" @onclick="CloseSidebar" aria-label="サイドバーを閉じる"></button>
+	}
+
+	<main class="app-content">
+		<header class="app-content__header">
+			<button class="app-edge-toggle" @onclick="ToggleSidebar" title="メニューを開く" aria-label="サイドメニューを開く">
+				<i class="bi bi-list"></i>
+			</button>
+			<h2 class="app-content__title">@CurrentPageTitle</h2>
+		</header>
+		<section class="app-content__body">
+			@Body
+		</section>
+	</main>
+</div>
+
+@code {
+	private const string SidebarModeStorageKey = "synctask.sidebar.mode";
+
+	private SidebarMode sidebarMode = SidebarMode.Fixed;
+	private bool isSidebarOpen = true;
+
+	private enum SidebarMode
+	{
+		Fixed,
+		AutoHide
+	}
+
+	private string CurrentPageTitle => GetPageTitle(Navigation.Uri);
+
+	private string SidebarWidth => sidebarMode == SidebarMode.Fixed ? "272px" : "312px";
+
+	protected override void OnInitialized()
+	{
+		Navigation.LocationChanged += OnLocationChanged;
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (!firstRender)
+		{
+			return;
+		}
+
+		try
+		{
+			var storedMode = await JS.InvokeAsync<string?>("localStorage.getItem", SidebarModeStorageKey);
+			if (Enum.TryParse<SidebarMode>(storedMode, true, out var parsedMode))
+			{
+				sidebarMode = parsedMode;
+				isSidebarOpen = sidebarMode == SidebarMode.Fixed;
+				StateHasChanged();
+			}
+		}
+		catch
+		{
+			// localStorage が利用できない環境では既定値を使用
+		}
+	}
+
+	private async Task ToggleSidebarModeAsync()
+	{
+		sidebarMode = sidebarMode == SidebarMode.Fixed ? SidebarMode.AutoHide : SidebarMode.Fixed;
+		isSidebarOpen = sidebarMode == SidebarMode.Fixed;
+
+		try
+		{
+			await JS.InvokeVoidAsync("localStorage.setItem", SidebarModeStorageKey, sidebarMode.ToString());
+		}
+		catch
+		{
+			// 永続化に失敗しても動作は継続
+		}
+	}
+
+	private void ToggleSidebar()
+	{
+		if (sidebarMode == SidebarMode.Fixed)
+		{
+			return;
+		}
+
+		isSidebarOpen = !isSidebarOpen;
+	}
+
+	private void CloseSidebar()
+	{
+		if (sidebarMode == SidebarMode.AutoHide)
+		{
+			isSidebarOpen = false;
+		}
+	}
+
+	private Task OnNavigateAsync()
+	{
+		if (sidebarMode == SidebarMode.AutoHide)
+		{
+			isSidebarOpen = false;
+		}
+
+		return Task.CompletedTask;
+	}
+
+	private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+	{
+		if (sidebarMode == SidebarMode.AutoHide)
+		{
+			isSidebarOpen = false;
+		}
+
+		InvokeAsync(StateHasChanged);
+	}
+
+	private string GetShellClass()
+	{
+		return sidebarMode == SidebarMode.Fixed ? "app-shell--fixed" : "app-shell--autohide";
+	}
+
+	private string GetSidebarClass()
+	{
+		if (sidebarMode == SidebarMode.Fixed)
+		{
+			return "app-sidebar--fixed";
+		}
+
+		return isSidebarOpen ? "app-sidebar--open" : "app-sidebar--closed";
+	}
+
+	private static string GetPageTitle(string currentUri)
+	{
+		var path = new Uri(currentUri).AbsolutePath.Trim('/').ToLowerInvariant();
+		return path switch
+		{
+			"" => "デイリー管理",
+			"redmine-settings" => "Redmine設定",
+			_ => "ページ"
+		};
+	}
+
+	public void Dispose()
+	{
+		Navigation.LocationChanged -= OnLocationChanged;
+	}
+}
