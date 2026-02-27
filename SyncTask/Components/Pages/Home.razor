@@ -44,27 +44,6 @@
             </div>
         </section>
 
-        <section class="daily-card glass-card">
-            <h2>稼働ヘッダー</h2>
-            <div class="daily-log__header daily-log__header--runtime">
-                <div>
-                    <label>日付</label>
-                    <InputDate @bind-Value="workDate" @onchange="OnWorkDateChanged" />
-                </div>
-                <div>
-                    <label>開始</label>
-                    <InputText @bind-Value="startTime" type="time" />
-                </div>
-                <div>
-                    <label>終了</label>
-                    <InputText @bind-Value="endTime" type="time" />
-                </div>
-                <div class="daily-log__header-action">
-                    <button class="btn btn--primary" @onclick="SaveHeaderAsync">保存</button>
-                </div>
-            </div>
-        </section>
-
         <section class="daily-card glass-card daily-card--full">
             <h2>作業入力</h2>
             <div class="daily-log__table-wrap">
@@ -198,8 +177,6 @@
     private const string DefaultMailBodyTemplate = "寺田様：\n\nお疲れ様です。岡です。\n\n${date}の作業報告をお送りいたします。\n\n■作業時間\n\n${worktime_section}\n\n■作業内容\n${content_section}\n\n■作業予定(${next_date})\n ●\n  ・";
 
     private DateTime workDate = DateTime.Today;
-    private string? startTime;
-    private string? endTime;
     private WorkLog? currentLog;
     private List<WorkLogEntry> entries = new();
     private RedmineSettings redmineSettings = new();
@@ -227,24 +204,10 @@
     private async Task LoadAsync()
     {
         currentLog = await DailyLogService.GetOrCreateDailyLogAsync(workDate);
-        startTime = currentLog.StartTime;
-        endTime = currentLog.EndTime;
         entries = await DailyLogService.GetEntriesAsync(currentLog.Id);
         RecalculateStartTimesFrom(1);
         EnsureTrailingEmptyRow();
         await PreloadProjectIssuesAsync(entries);
-    }
-
-    private async Task SaveHeaderAsync()
-    {
-        if (currentLog is null)
-        {
-            return;
-        }
-
-        currentLog.StartTime = startTime;
-        currentLog.EndTime = endTime;
-        await DailyLogService.SaveDailyLogAsync(currentLog);
     }
 
     private async Task DeleteGridRowAsync(WorkLogEntry entry)
@@ -275,7 +238,7 @@
         await RefreshTaskStatusesFromRedmineAsync();
 
         var templateText = await LoadMailBodyTemplateAsync();
-        generatedMailBody = BuildMailBody(templateText, workDate, startTime, endTime, entries);
+        generatedMailBody = BuildMailBody(templateText, workDate, entries);
         redmineStatusMessage = "勤務報告メール本文を生成しました。";
     }
 
@@ -764,11 +727,11 @@
         return string.Join(" / ", commentParts);
     }
 
-    private static string BuildMailBody(string templateText, DateTime targetDate, string? startTimeText, string? endTimeText, IReadOnlyList<WorkLogEntry> sourceEntries)
+    private static string BuildMailBody(string templateText, DateTime targetDate, IReadOnlyList<WorkLogEntry> sourceEntries)
     {
         var dateText = BuildReportDateText(targetDate, DateTime.Today);
         var nextDateText = targetDate.AddDays(1).ToString("MM/dd", CultureInfo.InvariantCulture);
-        var worktimeSection = BuildWorktimeSection(startTimeText, endTimeText, sourceEntries);
+        var worktimeSection = BuildWorktimeSection(sourceEntries);
         var contentSection = BuildContentSection(sourceEntries);
 
         var normalizedTemplate = string.IsNullOrWhiteSpace(templateText)
@@ -807,27 +770,29 @@
             : reportDateText;
     }
 
-    private static string BuildWorktimeSection(string? startTimeText, string? endTimeText, IEnumerable<WorkLogEntry> sourceEntries)
+    private static string BuildWorktimeSection(IEnumerable<WorkLogEntry> sourceEntries)
     {
-        var totalHours = sourceEntries
-            .Where(entry => entry.ActualHours > 0)
-            .Sum(entry => entry.ActualHours);
+        var targetEntries = sourceEntries
+            .Where(entry => !IsEntryEmpty(entry))
+            .ToList();
 
-        var hasStart = TimeSpan.TryParse(startTimeText, out var startTime);
-        var hasEnd = TimeSpan.TryParse(endTimeText, out var endTime);
-
-        if (hasStart && hasEnd)
+        if (targetEntries.Count == 0)
         {
-            var timeRange = $"{startTime:hh\\:mm}～{endTime:hh\\:mm}";
-            return totalHours > 0 ? $"{timeRange}({FormatHours(totalHours)}h)" : timeRange;
+            return "（未入力）";
         }
 
-        if (totalHours > 0)
+        var firstEntry = targetEntries[0];
+        var lastEntry = targetEntries[^1];
+
+        if (firstEntry.StartTime == TimeSpan.Zero || lastEntry.ActualEndTime == TimeSpan.Zero)
         {
-            return $"{FormatHours(totalHours)}h";
+            var totalHoursOnly = targetEntries.Sum(entry => entry.ActualHours);
+            return totalHoursOnly > 0 ? $"{FormatHours(totalHoursOnly)}h" : "（未入力）";
         }
 
-        return "（未入力）";
+        var timeRange = $"{firstEntry.StartTime:hh\\:mm}～{lastEntry.ActualEndTime:hh\\:mm}";
+        var totalHours = targetEntries.Sum(entry => entry.ActualHours);
+        return totalHours > 0 ? $"{timeRange}({FormatHours(totalHours)}h)" : timeRange;
     }
 
     private static string BuildContentSection(IEnumerable<WorkLogEntry> sourceEntries)
