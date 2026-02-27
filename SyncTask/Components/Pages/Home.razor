@@ -7,125 +7,167 @@
 @inject RedmineService RedmineService
 @inject IJSRuntime JS
 
-<h1>デイリー管理</h1>
+<div class="daily-page">
+    <section class="daily-page__hero glass-card">
+        <div>
+            <h1>デイリー管理</h1>
+            <p class="daily-page__subtitle">勤務報告の作成と Redmine 実工数登録を一画面で管理</p>
+        </div>
+        <div class="daily-page__badges">
+            <span class="daily-badge">対象日 @workDate.ToString("yyyy/MM/dd")</span>
+            <span class="daily-badge">タスク @entries.Count 件</span>
+            <span class="daily-badge">実工数 @FormatHours(entries.Sum(x => x.ActualHours)) h</span>
+        </div>
+    </section>
 
-<div class="daily-log">
-    <h2>Redmine設定</h2>
-    <div class="daily-log__entry">
-        <InputText @bind-Value="redmineSettings.BaseUrl" placeholder="Redmine URL (例: https://redmine.example.com)" />
-        <InputText @bind-Value="redmineSettings.ApiKey" placeholder="APIキー" />
-        <InputText @bind-Value="redmineSettings.StoryTrackerNames" placeholder="ストーリー用トラッカー名（カンマ区切り）" />
-        <InputText @bind-Value="redmineSettings.TaskTrackerNames" placeholder="タスク用トラッカー名（カンマ区切り）" />
-        <button class="btn" @onclick="SaveRedmineSettingsAsync" disabled="@isLoadingRedmine">設定保存</button>
-        <button class="btn" @onclick="LoadProjectsAsync" disabled="@isLoadingRedmine">Redmine読込</button>
-    </div>
     @if (!string.IsNullOrWhiteSpace(redmineStatusMessage))
     {
-        <p>@redmineStatusMessage</p>
+        <div class="daily-status glass-card">@redmineStatusMessage</div>
     }
 
-    <div class="daily-log__header">
-        <div>
-            <label>日付</label>
-            <InputDate @bind-Value="workDate" @onchange="OnWorkDateChanged" />
-        </div>
-        <div>
-            <label>開始</label>
-            <InputText @bind-Value="startTime" type="time" />
-        </div>
-        <div>
-            <label>終了</label>
-            <InputText @bind-Value="endTime" type="time" />
-        </div>
-        <div>
-            <button class="btn" @onclick="SaveHeaderAsync">保存</button>
-        </div>
-    </div>
+    <div class="daily-grid">
+        <section class="daily-card glass-card">
+            <h2>Redmine設定</h2>
+            <div class="daily-log__entry daily-log__entry--redmine-fields">
+                <InputText @bind-Value="redmineSettings.BaseUrl" placeholder="Redmine URL (例: https://redmine.example.com)" />
+            </div>
+            <div class="daily-log__entry daily-log__entry--redmine-fields">
+                <InputText @bind-Value="redmineSettings.ApiKey" placeholder="APIキー" />
+            </div>
+            <div class="daily-log__entry daily-log__entry--redmine-trackers">
+                <InputText @bind-Value="redmineSettings.StoryTrackerNames" placeholder="ストーリー用トラッカー名（カンマ区切り）" />
+                <InputText @bind-Value="redmineSettings.TaskTrackerNames" placeholder="タスク用トラッカー名（カンマ区切り）" />
+            </div>
+            <div class="daily-log__entry daily-log__entry--actions">
+                <button class="btn btn--primary" @onclick="SaveRedmineSettingsAsync" disabled="@isLoadingRedmine">設定保存</button>
+                <button class="btn btn--ghost" @onclick="LoadProjectsAsync" disabled="@isLoadingRedmine">Redmine読込</button>
+            </div>
+        </section>
 
-    <h2>作業入力</h2>
+        <section class="daily-card glass-card">
+            <h2>稼働ヘッダー</h2>
+            <div class="daily-log__header daily-log__header--runtime">
+                <div>
+                    <label>日付</label>
+                    <InputDate @bind-Value="workDate" @onchange="OnWorkDateChanged" />
+                </div>
+                <div>
+                    <label>開始</label>
+                    <InputText @bind-Value="startTime" type="time" />
+                </div>
+                <div>
+                    <label>終了</label>
+                    <InputText @bind-Value="endTime" type="time" />
+                </div>
+                <div class="daily-log__header-action">
+                    <button class="btn btn--primary" @onclick="SaveHeaderAsync">保存</button>
+                </div>
+            </div>
+        </section>
 
-    <div class="daily-log__entry">
-        <select value="@selectedProjectId" @onchange="OnProjectChangedAsync">
-            <option value="">プロジェクトを選択</option>
-            @foreach (var project in redmineProjects)
+        <section class="daily-card glass-card daily-card--full">
+            <h2>作業入力</h2>
+            <div class="daily-log__entry daily-log__entry--work-main">
+                <select value="@selectedProjectId" @onchange="OnProjectChangedAsync">
+                    <option value="">プロジェクトを選択</option>
+                    @foreach (var project in redmineProjects)
+                    {
+                        <option value="@project.Id">@project.Name</option>
+                    }
+                </select>
+
+                <select value="@selectedStoryIssueId" @onchange="OnStoryChanged">
+                    <option value="">ストーリーを選択</option>
+                    @foreach (var issue in redmineStories)
+                    {
+                        <option value="@issue.Id">#@issue.Id @issue.Subject</option>
+                    }
+                </select>
+
+                <select value="@selectedTaskIssueId" @onchange="OnTaskChanged">
+                    <option value="">タスクを選択</option>
+                    @foreach (var issue in redmineTasks)
+                    {
+                        <option value="@issue.Id">#@issue.Id @issue.Subject</option>
+                    }
+                </select>
+            </div>
+
+            <div class="daily-log__entry daily-log__entry--work-hours">
+                <InputNumber @bind-Value="plannedHours" placeholder="予定" />
+                <InputNumber @bind-Value="actualHours" placeholder="実工数" />
+                <button class="btn btn--primary" @onclick="AddEntryAsync">追加</button>
+            </div>
+
+            <div class="daily-log__table-wrap">
+                <table class="daily-log__table">
+                    <thead>
+                        <tr>
+                            <th>プロジェクト</th>
+                            <th>ストーリー</th>
+                            <th>タスク</th>
+                            <th>予定</th>
+                            <th>実工数</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (entries.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="6">入力されたデータはありません。</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var entry in entries)
+                            {
+                                <tr>
+                                    <td>@entry.Project</td>
+                                    <td>@entry.Story</td>
+                                    <td>@entry.Task</td>
+                                    <td>@entry.PlannedHours</td>
+                                    <td>@entry.ActualHours</td>
+                                    <td>
+                                        <button class="btn btn--danger" @onclick="() => DeleteEntryAsync(entry)">削除</button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="daily-card glass-card daily-card--full">
+            <div class="daily-card__title-row">
+                <h2>勤務報告メール本文</h2>
+                <span class="daily-badge">Becky!2 貼り付け向けプレビュー</span>
+            </div>
+
+            <div class="daily-log__entry">
+                <button class="btn btn--primary" @onclick="GenerateMailBodyAsync">本文生成</button>
+                <button class="btn btn--ghost" @onclick="CopyMailBodyAsync" disabled="@string.IsNullOrWhiteSpace(generatedMailBody)">本文をコピー</button>
+                @* <button class="btn" @onclick="ComposeWorkReportMailAsync" disabled="@string.IsNullOrWhiteSpace(generatedMailBody)">メール作成</button> *@
+                <button class="btn btn--ghost" @onclick="ComposeWorkReportMailAsync" disabled="true">メール作成</button>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(generatedMailBody))
             {
-                <option value="@project.Id">@project.Name</option>
-            }
-        </select>
-
-        <select value="@selectedStoryIssueId" @onchange="OnStoryChanged">
-            <option value="">ストーリーを選択</option>
-            @foreach (var issue in redmineStories)
-            {
-                <option value="@issue.Id">#@issue.Id @issue.Subject</option>
-            }
-        </select>
-
-        <select value="@selectedTaskIssueId" @onchange="OnTaskChanged">
-            <option value="">タスクを選択</option>
-            @foreach (var issue in redmineTasks)
-            {
-                <option value="@issue.Id">#@issue.Id @issue.Subject</option>
-            }
-        </select>
-
-        <InputNumber @bind-Value="plannedHours" placeholder="予定" />
-        <InputNumber @bind-Value="actualHours" placeholder="実工数" />
-        <button class="btn" @onclick="AddEntryAsync">追加</button>
-    </div>
-
-    <table class="daily-log__table">
-        <thead>
-            <tr>
-                <th>プロジェクト</th>
-                <th>ストーリー</th>
-                <th>タスク</th>
-                <th>予定</th>
-                <th>実工数</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @if (entries.Count == 0)
-            {
-                <tr>
-                    <td colspan="6">入力されたデータはありません。</td>
-                </tr>
+                <textarea class="daily-log__mail-preview" readonly>@generatedMailBody</textarea>
             }
             else
             {
-                @foreach (var entry in entries)
-                {
-                    <tr>
-                        <td>@entry.Project</td>
-                        <td>@entry.Story</td>
-                        <td>@entry.Task</td>
-                        <td>@entry.PlannedHours</td>
-                        <td>@entry.ActualHours</td>
-                        <td>
-                            <button class="btn" @onclick="() => DeleteEntryAsync(entry)">削除</button>
-                        </td>
-                    </tr>
-                }
+                <div class="daily-log__mail-empty">本文生成を押すと、ここにメール本文が表示されます。</div>
             }
-        </tbody>
-    </table>
+        </section>
 
-    <h2>勤務報告メール本文</h2>
-    <div class="daily-log__entry">
-        <button class="btn" @onclick="GenerateMailBodyAsync">本文生成</button>
-        <button class="btn" @onclick="CopyMailBodyAsync" disabled="@string.IsNullOrWhiteSpace(generatedMailBody)">本文をコピー</button>
-        @* <button class="btn" @onclick="ComposeWorkReportMailAsync" disabled="@string.IsNullOrWhiteSpace(generatedMailBody)">メール作成</button> *@
-        <button class="btn" @onclick="ComposeWorkReportMailAsync" disabled="true">メール作成</button>
-    </div>
-
-    @if (!string.IsNullOrWhiteSpace(generatedMailBody))
-    {
-        <textarea class="daily-log__mail-preview" readonly>@generatedMailBody</textarea>
-    }
-
-    <div class="daily-log__entry">
-        <button class="btn" @onclick="RegisterSpentTimeToRedmineAsync" disabled="@isLoadingRedmine">一日の実工数をRedmineへ一括登録</button>
+        <section class="daily-card glass-card daily-card--full">
+            <h2>Redmine連携</h2>
+            <div class="daily-log__entry">
+                <button class="btn btn--primary" @onclick="RegisterSpentTimeToRedmineAsync" disabled="@isLoadingRedmine">一日の実工数をRedmineへ一括登録</button>
+            </div>
+        </section>
     </div>
 </div>
 

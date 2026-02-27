@@ -78,9 +78,310 @@ h1:focus {
     }
 }
 
+.daily-page {
+    padding: 1.25rem;
+    color: #0f172a;
+    background: radial-gradient(circle at 10% 10%, rgba(59, 130, 246, 0.16), transparent 42%), radial-gradient(circle at 90% 0%, rgba(236, 72, 153, 0.14), transparent 36%), #f4f7fb;
+    min-height: calc(100vh - 2rem);
+}
+
+.glass-card {
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.68));
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
+    backdrop-filter: blur(18px) saturate(1.25);
+    -webkit-backdrop-filter: blur(18px) saturate(1.25);
+}
+
+.daily-page__hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    padding: 1.5rem;
+}
+
+.daily-page__hero h1 {
+    margin: 0;
+    font-size: 1.65rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.daily-page__subtitle {
+    margin: 0.4rem 0 0;
+    color: rgba(15, 23, 42, 0.78);
+}
+
+.daily-page__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.daily-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #1e293b;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.daily-status {
+    margin-bottom: 1rem;
+    padding: 0.8rem 1rem;
+    color: #1d4ed8;
+    font-weight: 600;
+}
+
+.daily-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.daily-card {
+    padding: 1.15rem;
+}
+
+.daily-card h2 {
+    margin: 0 0 0.9rem;
+    font-size: 1.05rem;
+    color: #1f2937;
+}
+
+.daily-card--full {
+    grid-column: 1 / -1;
+}
+
+.daily-card__title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    margin-bottom: 0.75rem;
+}
+
+.daily-log__entry,
+.daily-log__header {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.65rem;
+}
+
+.daily-log__entry input,
+.daily-log__entry select,
+.daily-log__header input,
+.daily-log__header select,
+.daily-log__header button,
+.daily-log__entry button {
+    width: 100%;
+    min-height: 2.15rem;
+    border-radius: 12px;
+    box-sizing: border-box;
+}
+
+.daily-log__entry input,
+.daily-log__entry select,
+.daily-log__header input,
+.daily-log__header select {
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    background: rgba(255, 255, 255, 0.92);
+    color: #0f172a;
+    padding: 0.42rem 0.68rem;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.daily-log__entry--redmine-fields {
+    grid-template-columns: 1fr;
+}
+
+.daily-log__entry--redmine-trackers {
+    margin-top: 0.65rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.daily-log__entry--actions {
+    margin-top: 0.65rem;
+    grid-template-columns: repeat(2, minmax(140px, 220px));
+    justify-content: start;
+}
+
+.daily-log__header--runtime {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: start;
+}
+
+.daily-log__header--runtime > div {
+    min-width: 0;
+}
+
+.daily-log__header-action {
+    align-self: start;
+    padding-top: 1.62rem;
+}
+
+.daily-log__entry--work-main {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.daily-log__entry--work-hours {
+    margin-top: 0.65rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.daily-log__entry input:focus,
+.daily-log__entry select:focus,
+.daily-log__header input:focus,
+.daily-log__header select:focus {
+    border-color: rgba(37, 99, 235, 0.75);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
+    outline: none;
+}
+
+.daily-log__header label {
+    display: block;
+    font-size: 0.82rem;
+    color: #334155;
+    margin-bottom: 0.3rem;
+    font-weight: 600;
+}
+
+.btn {
+    border: none;
+    border-radius: 12px;
+    padding: 0.42rem 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.25;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.btn:disabled {
+    opacity: 0.56;
+    cursor: not-allowed;
+}
+
+.btn--primary {
+    color: #fff;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    box-shadow: 0 10px 24px rgba(79, 70, 229, 0.3);
+}
+
+.btn--ghost {
+    color: #1e293b;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(148, 163, 184, 0.45);
+}
+
+.btn--danger {
+    color: #fff;
+    background: linear-gradient(135deg, #dc2626, #f97316);
+}
+
+.btn:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(30, 41, 59, 0.14);
+}
+
+.daily-log__table-wrap {
+    margin-top: 0.85rem;
+    overflow-x: auto;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.32);
+}
+
+.daily-log__table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255, 255, 255, 0.82);
+}
+
+.daily-log__table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: rgba(241, 245, 249, 0.95);
+    color: #334155;
+    font-size: 0.82rem;
+    text-align: left;
+}
+
+.daily-log__table th,
+.daily-log__table td {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    padding: 0.6rem 0.7rem;
+    vertical-align: top;
+}
+
+.daily-log__table tbody tr:nth-child(even) {
+    background: rgba(248, 250, 252, 0.68);
+}
+
+.daily-log__table tbody tr:hover {
+    background: rgba(219, 234, 254, 0.34);
+}
+
 .daily-log__mail-preview {
     width: 100%;
-    min-height: 18rem;
+    min-height: 22rem;
+    margin-top: 0.5rem;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
+    color: #0f172a;
+    padding: 1rem 1.1rem;
     resize: vertical;
     white-space: pre-wrap;
+    line-height: 1.6;
+    font-size: 0.95rem;
+    font-family: "MS Gothic", "ＭＳ ゴシック", "MS PGothic", monospace;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.daily-log__mail-preview:focus {
+    outline: 2px solid rgba(37, 99, 235, 0.4);
+    outline-offset: 2px;
+}
+
+.daily-log__mail-empty {
+    margin-top: 0.45rem;
+    border: 1px dashed rgba(148, 163, 184, 0.5);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.55);
+    color: #475569;
+    padding: 1rem;
+}
+
+@media (max-width: 900px) {
+    .daily-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .daily-page__hero {
+        flex-direction: column;
+    }
+
+    .daily-page__badges {
+        justify-content: flex-start;
+    }
+
+    .daily-log__entry--actions,
+    .daily-log__entry--redmine-trackers,
+    .daily-log__entry--work-main,
+    .daily-log__entry--work-hours,
+    .daily-log__header--runtime {
+        grid-template-columns: 1fr;
+    }
+
+    .daily-log__header-action {
+        padding-top: 0;
+    }
 }
