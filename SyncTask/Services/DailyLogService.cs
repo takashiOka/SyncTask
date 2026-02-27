@@ -69,6 +69,21 @@ public class DailyLogService
         {
             await database.ExecuteAsync("ALTER TABLE WorkLogEntry ADD COLUMN TaskStatusLabel TEXT NULL");
         }
+
+        if (!columnNames.Contains("StartTime"))
+        {
+            await database.ExecuteAsync("ALTER TABLE WorkLogEntry ADD COLUMN StartTime BIGINT NOT NULL DEFAULT 0");
+        }
+
+        if (!columnNames.Contains("PlannedEndTime"))
+        {
+            await database.ExecuteAsync("ALTER TABLE WorkLogEntry ADD COLUMN PlannedEndTime BIGINT NOT NULL DEFAULT 0");
+        }
+
+        if (!columnNames.Contains("ActualEndTime"))
+        {
+            await database.ExecuteAsync("ALTER TABLE WorkLogEntry ADD COLUMN ActualEndTime BIGINT NOT NULL DEFAULT 0");
+        }
     }
 
     public async Task<WorkLog> GetOrCreateDailyLogAsync(DateTime workDate)

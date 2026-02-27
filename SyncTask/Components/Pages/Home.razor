@@ -15,7 +15,7 @@
         </div>
         <div class="daily-page__badges">
             <span class="daily-badge">対象日 @workDate.ToString("yyyy/MM/dd")</span>
-            <span class="daily-badge">タスク @entries.Count 件</span>
+            <span class="daily-badge">タスク @entries.Count(x => !IsEntryEmpty(x)) 件</span>
             <span class="daily-badge">実工数 @FormatHours(entries.Sum(x => x.ActualHours)) h</span>
         </div>
     </section>
@@ -67,38 +67,6 @@
 
         <section class="daily-card glass-card daily-card--full">
             <h2>作業入力</h2>
-            <div class="daily-log__entry daily-log__entry--work-main">
-                <select value="@selectedProjectId" @onchange="OnProjectChangedAsync">
-                    <option value="">プロジェクトを選択</option>
-                    @foreach (var project in redmineProjects)
-                    {
-                        <option value="@project.Id">@project.Name</option>
-                    }
-                </select>
-
-                <select value="@selectedStoryIssueId" @onchange="OnStoryChanged">
-                    <option value="">ストーリーを選択</option>
-                    @foreach (var issue in redmineStories)
-                    {
-                        <option value="@issue.Id">#@issue.Id @issue.Subject</option>
-                    }
-                </select>
-
-                <select value="@selectedTaskIssueId" @onchange="OnTaskChanged">
-                    <option value="">タスクを選択</option>
-                    @foreach (var issue in redmineTasks)
-                    {
-                        <option value="@issue.Id">#@issue.Id @issue.Subject</option>
-                    }
-                </select>
-            </div>
-
-            <div class="daily-log__entry daily-log__entry--work-hours">
-                <InputNumber @bind-Value="plannedHours" placeholder="予定" />
-                <InputNumber @bind-Value="actualHours" placeholder="実工数" />
-                <button class="btn btn--primary" @onclick="AddEntryAsync">追加</button>
-            </div>
-
             <div class="daily-log__table-wrap">
                 <table class="daily-log__table">
                     <thead>
@@ -106,33 +74,87 @@
                             <th>プロジェクト</th>
                             <th>ストーリー</th>
                             <th>タスク</th>
+                            <th>開始時間</th>
                             <th>予定</th>
+                            <th>終了予定</th>
+                            <th>実終了</th>
                             <th>実工数</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        @if (entries.Count == 0)
+                        @for (var index = 0; index < entries.Count; index++)
                         {
+                            var entry = entries[index];
+                            var stories = GetStoryOptions(entry);
+                            var tasks = GetTaskOptions(entry);
+
                             <tr>
-                                <td colspan="6">入力されたデータはありません。</td>
+                                <td>
+                                    <select value="@(entry.RedmineProjectId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
+                                            @onchange="async args => await OnGridProjectChangedAsync(entry, args)"
+                                            @onblur="async _ => await SaveGridRowAsync(entry)">
+                                        <option value="">プロジェクトを選択</option>
+                                        @foreach (var project in GetProjectOptions(entry))
+                                        {
+                                            <option value="@project.Id" selected="@(entry.RedmineProjectId == project.Id)">@project.Name</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <select value="@(entry.RedmineStoryIssueId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
+                                            @onchange="args => OnGridStoryChanged(entry, args)"
+                                            @onblur="async _ => await SaveGridRowAsync(entry)"
+                                            disabled="@(!entry.RedmineProjectId.HasValue)">
+                                        <option value="">ストーリーを選択</option>
+                                        @foreach (var issue in stories)
+                                        {
+                                            <option value="@issue.Id">#@issue.Id @issue.Subject</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <select value="@(entry.RedmineTaskIssueId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
+                                            @onchange="args => OnGridTaskChanged(entry, args)"
+                                            @onblur="async _ => await SaveGridRowAsync(entry)"
+                                            disabled="@(!entry.RedmineProjectId.HasValue)">
+                                        <option value="">タスクを選択</option>
+                                        @foreach (var issue in tasks)
+                                        {
+                                            <option value="@issue.Id">#@issue.Id @issue.Subject</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="time"
+                                           value="@ToInputTime(entry.StartTime)"
+                                           @oninput="args => OnGridStartTimeChanged(entry, args)"
+                                           @onblur="async _ => await SaveGridRowAsync(entry)"
+                                           disabled="@(index > 0)" />
+                                </td>
+                                <td>
+                                    <input type="number"
+                                           min="0"
+                                           step="0.25"
+                                           value="@ToInputDecimal(entry.PlannedHours)"
+                                           @oninput="args => OnGridPlannedHoursChanged(entry, args)"
+                                           @onblur="async _ => await SaveGridRowAsync(entry)" />
+                                </td>
+                                <td class="daily-grid-cell--readonly">@FormatTime(entry.PlannedEndTime)</td>
+                                <td>
+                                    <input type="time"
+                                           value="@ToInputTime(entry.ActualEndTime)"
+                                           @oninput="args => OnGridActualEndTimeChanged(entry, args)"
+                                           @onblur="async _ => await SaveGridRowAsync(entry)" />
+                                </td>
+                                <td class="daily-grid-cell--readonly">@FormatHours(entry.ActualHours)</td>
+                                <td>
+                                    @if (!IsEntryEmpty(entry))
+                                    {
+                                        <button class="btn btn--danger" @onclick="() => DeleteGridRowAsync(entry)">削除</button>
+                                    }
+                                </td>
                             </tr>
-                        }
-                        else
-                        {
-                            @foreach (var entry in entries)
-                            {
-                                <tr>
-                                    <td>@entry.Project</td>
-                                    <td>@entry.Story</td>
-                                    <td>@entry.Task</td>
-                                    <td>@entry.PlannedHours</td>
-                                    <td>@entry.ActualHours</td>
-                                    <td>
-                                        <button class="btn btn--danger" @onclick="() => DeleteEntryAsync(entry)">削除</button>
-                                    </td>
-                                </tr>
-                            }
                         }
                     </tbody>
                 </table>
@@ -182,13 +204,7 @@
     private List<WorkLogEntry> entries = new();
     private RedmineSettings redmineSettings = new();
     private List<RedmineProject> redmineProjects = new();
-    private List<RedmineIssue> redmineStories = new();
-    private List<RedmineIssue> redmineTasks = new();
-    private int? selectedProjectId;
-    private int? selectedStoryIssueId;
-    private int? selectedTaskIssueId;
-    private decimal plannedHours;
-    private decimal actualHours;
+    private readonly Dictionary<int, RedmineIssueSplitResult> projectIssueCache = new();
     private bool isLoadingRedmine;
     private string? redmineStatusMessage;
     private string generatedMailBody = string.Empty;
@@ -214,6 +230,9 @@
         startTime = currentLog.StartTime;
         endTime = currentLog.EndTime;
         entries = await DailyLogService.GetEntriesAsync(currentLog.Id);
+        RecalculateStartTimesFrom(1);
+        EnsureTrailingEmptyRow();
+        await PreloadProjectIssuesAsync(entries);
     }
 
     private async Task SaveHeaderAsync()
@@ -228,56 +247,22 @@
         await DailyLogService.SaveDailyLogAsync(currentLog);
     }
 
-    private async Task AddEntryAsync()
+    private async Task DeleteGridRowAsync(WorkLogEntry entry)
     {
-        if (currentLog is null)
+        var removedIndex = entries.IndexOf(entry);
+        entries.Remove(entry);
+
+        if (entry.Id != 0)
         {
-            return;
+            await DailyLogService.DeleteEntryAsync(entry);
         }
 
-        var selectedProject = redmineProjects.FirstOrDefault(x => x.Id == selectedProjectId);
-        if (selectedProject is null)
+        if (removedIndex >= 0)
         {
-            redmineStatusMessage = "プロジェクトを選択してください。";
-            return;
+            RecalculateStartTimesFrom(Math.Max(1, removedIndex));
         }
 
-        var selectedStory = redmineStories.FirstOrDefault(x => x.Id == selectedStoryIssueId);
-        var selectedTask = redmineTasks.FirstOrDefault(x => x.Id == selectedTaskIssueId);
-        var taskStatusLabel = MapTaskStatusLabel(selectedTask?.Status?.IsClosed);
-
-        var newEntry = new WorkLogEntry
-        {
-            WorkLogId = currentLog.Id,
-            Project = selectedProject.Name,
-            RedmineProjectId = selectedProject.Id,
-            Story = selectedStory is null ? string.Empty : $"#{selectedStory.Id} {selectedStory.Subject}",
-            RedmineStoryIssueId = selectedStory?.Id,
-            Task = selectedTask is null ? string.Empty : $"#{selectedTask.Id} {selectedTask.Subject}",
-            RedmineTaskIssueId = selectedTask?.Id,
-            RedmineTaskIsClosed = selectedTask?.Status?.IsClosed,
-            TaskStatusLabel = taskStatusLabel,
-            PlannedHours = plannedHours,
-            ActualHours = actualHours
-        };
-
-        await DailyLogService.SaveEntryAsync(newEntry);
-        entries = await DailyLogService.GetEntriesAsync(currentLog.Id);
-        selectedStoryIssueId = null;
-        selectedTaskIssueId = null;
-        plannedHours = 0;
-        actualHours = 0;
-    }
-
-    private async Task DeleteEntryAsync(WorkLogEntry entry)
-    {
-        await DailyLogService.DeleteEntryAsync(entry);
-        if (currentLog is null)
-        {
-            return;
-        }
-
-        entries = await DailyLogService.GetEntriesAsync(currentLog.Id);
+        EnsureTrailingEmptyRow();
     }
 
     private Task GenerateMailBodyAsync()
@@ -446,17 +431,10 @@
             await DailyLogService.SaveRedmineSettingsAsync(redmineSettings);
             redmineProjects = await RedmineService.GetProjectsAsync(redmineSettings);
             redmineStatusMessage = $"プロジェクトを {redmineProjects.Count} 件取得しました。";
-
-            if (selectedProjectId.HasValue)
-            {
-                await LoadIssuesForSelectedProjectAsync();
-            }
         }
         catch (Exception ex)
         {
             redmineStatusMessage = $"Redmine取得に失敗しました: {ex.Message}";
-            redmineStories.Clear();
-            redmineTasks.Clear();
         }
         finally
         {
@@ -464,59 +442,281 @@
         }
     }
 
-    private async Task OnProjectChangedAsync(ChangeEventArgs args)
+    private async Task PreloadProjectIssuesAsync(IEnumerable<WorkLogEntry> sourceEntries)
     {
-        selectedProjectId = ParseNullableInt(args?.Value?.ToString());
-        await LoadIssuesForSelectedProjectAsync();
-    }
+        var projectIds = sourceEntries
+            .Where(entry => entry.RedmineProjectId.HasValue)
+            .Select(entry => entry.RedmineProjectId!.Value)
+            .Distinct()
+            .ToList();
 
-    private void OnStoryChanged(ChangeEventArgs args)
-    {
-        selectedStoryIssueId = ParseNullableInt(args?.Value?.ToString());
-    }
-
-    private void OnTaskChanged(ChangeEventArgs args)
-    {
-        selectedTaskIssueId = ParseNullableInt(args?.Value?.ToString());
-    }
-
-    private async Task LoadIssuesForSelectedProjectAsync()
-    {
-        selectedStoryIssueId = null;
-        selectedTaskIssueId = null;
-
-        if (!selectedProjectId.HasValue)
+        foreach (var projectId in projectIds)
         {
-            redmineStories.Clear();
-            redmineTasks.Clear();
+            await EnsureProjectIssuesLoadedAsync(projectId);
+        }
+    }
+
+    private async Task EnsureProjectIssuesLoadedAsync(int projectId)
+    {
+        if (projectIssueCache.ContainsKey(projectId))
+        {
             return;
         }
 
-        isLoadingRedmine = true;
-        redmineStatusMessage = null;
+        if (string.IsNullOrWhiteSpace(redmineSettings.BaseUrl) || string.IsNullOrWhiteSpace(redmineSettings.ApiKey))
+        {
+            return;
+        }
 
-        try
+        var issues = await RedmineService.GetIssuesForProjectAsync(redmineSettings, projectId);
+        projectIssueCache[projectId] = issues;
+    }
+
+    private IReadOnlyList<RedmineIssue> GetStoryOptions(WorkLogEntry entry)
+    {
+        if (!entry.RedmineProjectId.HasValue)
         {
-            var issues = await RedmineService.GetIssuesForProjectAsync(redmineSettings, selectedProjectId.Value);
-            redmineStories = issues.Stories;
-            redmineTasks = issues.Tasks;
-            redmineStatusMessage = $"ストーリー {redmineStories.Count} 件 / タスク {redmineTasks.Count} 件を取得しました。";
+            return Array.Empty<RedmineIssue>();
         }
-        catch (Exception ex)
+
+        return projectIssueCache.TryGetValue(entry.RedmineProjectId.Value, out var split)
+            ? split.Stories
+            : Array.Empty<RedmineIssue>();
+    }
+
+    private IReadOnlyList<RedmineIssue> GetTaskOptions(WorkLogEntry entry)
+    {
+        if (!entry.RedmineProjectId.HasValue)
         {
-            redmineStatusMessage = $"チケット取得に失敗しました: {ex.Message}";
-            redmineStories.Clear();
-            redmineTasks.Clear();
+            return Array.Empty<RedmineIssue>();
         }
-        finally
+
+        return projectIssueCache.TryGetValue(entry.RedmineProjectId.Value, out var split)
+            ? split.Tasks
+            : Array.Empty<RedmineIssue>();
+    }
+
+    private IReadOnlyList<RedmineProject> GetProjectOptions(WorkLogEntry entry)
+    {
+        if (entry.RedmineProjectId.HasValue
+            && !string.IsNullOrWhiteSpace(entry.Project)
+            && redmineProjects.All(project => project.Id != entry.RedmineProjectId.Value))
         {
-            isLoadingRedmine = false;
+            var merged = new List<RedmineProject>(redmineProjects.Count + 1)
+            {
+                new RedmineProject
+                {
+                    Id = entry.RedmineProjectId.Value,
+                    Name = entry.Project
+                }
+            };
+
+            merged.AddRange(redmineProjects);
+            return merged;
         }
+
+        return redmineProjects;
+    }
+
+    private async Task OnGridProjectChangedAsync(WorkLogEntry entry, ChangeEventArgs args)
+    {
+        entry.RedmineProjectId = ParseNullableInt(args?.Value?.ToString());
+        var project = redmineProjects.FirstOrDefault(x => x.Id == entry.RedmineProjectId);
+        entry.Project = project?.Name ?? string.Empty;
+
+        entry.RedmineStoryIssueId = null;
+        entry.Story = string.Empty;
+        entry.RedmineTaskIssueId = null;
+        entry.Task = string.Empty;
+        entry.RedmineTaskIsClosed = null;
+        entry.TaskStatusLabel = string.Empty;
+
+        if (entry.RedmineProjectId.HasValue)
+        {
+            await EnsureProjectIssuesLoadedAsync(entry.RedmineProjectId.Value);
+        }
+    }
+
+    private void OnGridStoryChanged(WorkLogEntry entry, ChangeEventArgs args)
+    {
+        entry.RedmineStoryIssueId = ParseNullableInt(args?.Value?.ToString());
+        var selectedStory = GetStoryOptions(entry).FirstOrDefault(x => x.Id == entry.RedmineStoryIssueId);
+        entry.Story = selectedStory is null ? string.Empty : $"#{selectedStory.Id} {selectedStory.Subject}";
+    }
+
+    private void OnGridTaskChanged(WorkLogEntry entry, ChangeEventArgs args)
+    {
+        entry.RedmineTaskIssueId = ParseNullableInt(args?.Value?.ToString());
+        var selectedTask = GetTaskOptions(entry).FirstOrDefault(x => x.Id == entry.RedmineTaskIssueId);
+        entry.Task = selectedTask is null ? string.Empty : $"#{selectedTask.Id} {selectedTask.Subject}";
+        entry.RedmineTaskIsClosed = selectedTask?.Status?.IsClosed;
+        entry.TaskStatusLabel = MapTaskStatusLabel(entry.RedmineTaskIsClosed);
+    }
+
+    private void OnGridStartTimeChanged(WorkLogEntry entry, ChangeEventArgs args)
+    {
+        if (entries.IndexOf(entry) > 0)
+        {
+            return;
+        }
+
+        entry.StartTime = ParseTimeSpan(args?.Value?.ToString());
+        RecalculateGridEntry(entry);
+    }
+
+    private void OnGridPlannedHoursChanged(WorkLogEntry entry, ChangeEventArgs args)
+    {
+        entry.PlannedHours = ParseDecimal(args?.Value?.ToString());
+        RecalculateGridEntry(entry);
+    }
+
+    private void OnGridActualEndTimeChanged(WorkLogEntry entry, ChangeEventArgs args)
+    {
+        entry.ActualEndTime = ParseTimeSpan(args?.Value?.ToString());
+        RecalculateGridEntry(entry);
+
+        if (entry.StartTime != TimeSpan.Zero && entry.ActualEndTime != TimeSpan.Zero)
+        {
+            entry.PlannedHours = entry.ActualHours;
+            RecalculateGridEntry(entry);
+        }
+
+        var currentIndex = entries.IndexOf(entry);
+        if (currentIndex >= 0)
+        {
+            RecalculateStartTimesFrom(currentIndex + 1);
+        }
+    }
+
+    private async Task SaveGridRowAsync(WorkLogEntry entry)
+    {
+        if (currentLog is null)
+        {
+            return;
+        }
+
+        RecalculateGridEntry(entry);
+
+        if (IsEntryEmpty(entry))
+        {
+            if (entry.Id != 0)
+            {
+                await DailyLogService.DeleteEntryAsync(entry);
+                entries.Remove(entry);
+            }
+
+            EnsureTrailingEmptyRow();
+            return;
+        }
+
+        entry.WorkLogId = currentLog.Id;
+        await DailyLogService.SaveEntryAsync(entry);
+        EnsureTrailingEmptyRow();
+    }
+
+    private static void RecalculateGridEntry(WorkLogEntry entry)
+    {
+        if (entry.StartTime != TimeSpan.Zero && entry.PlannedHours > 0)
+        {
+            entry.PlannedEndTime = entry.StartTime + TimeSpan.FromHours((double)entry.PlannedHours);
+        }
+        else
+        {
+            entry.PlannedEndTime = TimeSpan.Zero;
+        }
+
+        if (entry.StartTime == TimeSpan.Zero || entry.ActualEndTime == TimeSpan.Zero)
+        {
+            entry.ActualHours = 0;
+            return;
+        }
+
+        var diff = entry.ActualEndTime - entry.StartTime;
+        if (diff < TimeSpan.Zero)
+        {
+            diff = diff.Add(TimeSpan.FromDays(1));
+        }
+
+        var roundedHours = Math.Round(diff.TotalHours * 4, MidpointRounding.AwayFromZero) / 4;
+        entry.ActualHours = (decimal)Math.Max(0, roundedHours);
+    }
+
+    private void RecalculateStartTimesFrom(int startRowIndex)
+    {
+        if (startRowIndex < 1)
+        {
+            startRowIndex = 1;
+        }
+
+        for (var rowIndex = startRowIndex; rowIndex < entries.Count; rowIndex++)
+        {
+            var previousRow = entries[rowIndex - 1];
+            var currentRow = entries[rowIndex];
+
+            currentRow.StartTime = previousRow.ActualEndTime;
+            RecalculateGridEntry(currentRow);
+        }
+    }
+
+    private void EnsureTrailingEmptyRow()
+    {
+        if (entries.Count == 0)
+        {
+            entries.Add(new WorkLogEntry());
+            return;
+        }
+
+        if (!IsEntryEmpty(entries[^1]))
+        {
+            entries.Add(new WorkLogEntry());
+        }
+    }
+
+    private static bool IsEntryEmpty(WorkLogEntry entry)
+    {
+        return string.IsNullOrWhiteSpace(entry.Project)
+            && !entry.RedmineProjectId.HasValue
+            && string.IsNullOrWhiteSpace(entry.Story)
+            && !entry.RedmineStoryIssueId.HasValue
+            && string.IsNullOrWhiteSpace(entry.Task)
+            && !entry.RedmineTaskIssueId.HasValue
+            && entry.StartTime == TimeSpan.Zero
+            && entry.PlannedEndTime == TimeSpan.Zero
+            && entry.ActualEndTime == TimeSpan.Zero
+            && entry.PlannedHours == 0
+            && entry.ActualHours == 0;
     }
 
     private static int? ParseNullableInt(string? raw)
     {
         return int.TryParse(raw, out var value) ? value : null;
+    }
+
+    private static decimal ParseDecimal(string? raw)
+    {
+        return decimal.TryParse(raw, NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : 0;
+    }
+
+    private static TimeSpan ParseTimeSpan(string? raw)
+    {
+        return TimeSpan.TryParse(raw, CultureInfo.InvariantCulture, out var value) ? value : TimeSpan.Zero;
+    }
+
+    private static string ToInputTime(TimeSpan time)
+    {
+        return time == TimeSpan.Zero ? string.Empty : time.ToString("hh\\:mm", CultureInfo.InvariantCulture);
+    }
+
+    private static string ToInputDecimal(decimal value)
+    {
+        return value == 0 ? string.Empty : value.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatTime(TimeSpan time)
+    {
+        return time == TimeSpan.Zero ? "-" : time.ToString("hh\\:mm", CultureInfo.InvariantCulture);
     }
 
     private static List<RedmineTimeEntryDraft> BuildTimeEntryDrafts(IEnumerable<WorkLogEntry> sourceEntries)

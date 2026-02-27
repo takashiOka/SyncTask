@@ -27,6 +27,12 @@ public class WorkLogEntry
 
     public string TaskStatusLabel { get; set; } = string.Empty;
 
+    public TimeSpan StartTime { get; set; }
+
+    public TimeSpan PlannedEndTime { get; set; }
+
+    public TimeSpan ActualEndTime { get; set; }
+
     public decimal PlannedHours { get; set; }
 
     public decimal ActualHours { get; set; }
