@@ -77,3 +77,10 @@ h1:focus {
         padding-left: env(safe-area-inset-left);
     }
 }
+
+.daily-log__mail-preview {
+    width: 100%;
+    min-height: 18rem;
+    resize: vertical;
+    white-space: pre-wrap;
+}

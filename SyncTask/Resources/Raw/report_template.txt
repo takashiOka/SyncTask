@@ -1,0 +1,17 @@
+
+寺田様：
+
+お疲れ様です。岡です。
+
+${date}の作業報告をお送りいたします。
+
+■作業時間
+
+${worktime_section}
+
+■作業内容
+${content_section}
+
+■作業予定(${next_date})
+ ●
+  ・
