@@ -1,0 +1,5 @@
+{
+  "dotnet.defaultSolution": "SyncTask.slnx",
+  "dotnet.automaticallyCreateSolutionInWorkspace": false,
+  "dotnet.solution.autoOpen": "SyncTask.slnx"
+}

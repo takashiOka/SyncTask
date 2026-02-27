@@ -1,0 +1,64 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+out/
+artifacts/
+
+# Visual Studio / Rider
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+_ReSharper*/
+*.DotSettings.user
+
+# VS Code local settings
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+!**/packages/build/
+!**/packages/repositories.config
+
+# Logs and diagnostics
+*.log
+*.tlog
+*.tmp
+*.temp
+TestResults/
+
+# OS-generated files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# MAUI / Xamarin generated files
+*.apk
+*.aab
+*.apks
+*.ipa
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+*.mobileprovision
+*.p12
+*.jks
+
+# SQLite runtime files
+*.db-shm
+*.db-wal
+*.db3-shm
+*.db3-wal
+
+# Local environment / secrets
+.env
+.env.*
+secrets.json

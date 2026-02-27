@@ -1,0 +1,385 @@
+﻿@page "/"
+@inject DailyLogService DailyLogService
+@inject RedmineService RedmineService
+
+<h1>デイリー管理</h1>
+
+<div class="daily-log">
+    <h2>Redmine設定</h2>
+    <div class="daily-log__entry">
+        <InputText @bind-Value="redmineSettings.BaseUrl" placeholder="Redmine URL (例: https://redmine.example.com)" />
+        <InputText @bind-Value="redmineSettings.ApiKey" placeholder="APIキー" />
+        <InputText @bind-Value="redmineSettings.StoryTrackerNames" placeholder="ストーリー用トラッカー名（カンマ区切り）" />
+        <InputText @bind-Value="redmineSettings.TaskTrackerNames" placeholder="タスク用トラッカー名（カンマ区切り）" />
+        <button class="btn" @onclick="SaveRedmineSettingsAsync" disabled="@isLoadingRedmine">設定保存</button>
+        <button class="btn" @onclick="LoadProjectsAsync" disabled="@isLoadingRedmine">Redmine読込</button>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(redmineStatusMessage))
+    {
+        <p>@redmineStatusMessage</p>
+    }
+
+    <div class="daily-log__header">
+        <div>
+            <label>日付</label>
+            <InputDate @bind-Value="workDate" @onchange="OnWorkDateChanged" />
+        </div>
+        <div>
+            <label>開始</label>
+            <InputText @bind-Value="startTime" type="time" />
+        </div>
+        <div>
+            <label>終了</label>
+            <InputText @bind-Value="endTime" type="time" />
+        </div>
+        <div>
+            <button class="btn" @onclick="SaveHeaderAsync">保存</button>
+        </div>
+    </div>
+
+    <h2>作業入力</h2>
+
+    <div class="daily-log__entry">
+        <select value="@selectedProjectId" @onchange="OnProjectChangedAsync">
+            <option value="">プロジェクトを選択</option>
+            @foreach (var project in redmineProjects)
+            {
+                <option value="@project.Id">@project.Name</option>
+            }
+        </select>
+
+        <select value="@selectedStoryIssueId" @onchange="OnStoryChanged">
+            <option value="">ストーリーを選択</option>
+            @foreach (var issue in redmineStories)
+            {
+                <option value="@issue.Id">#@issue.Id @issue.Subject</option>
+            }
+        </select>
+
+        <select value="@selectedTaskIssueId" @onchange="OnTaskChanged">
+            <option value="">タスクを選択</option>
+            @foreach (var issue in redmineTasks)
+            {
+                <option value="@issue.Id">#@issue.Id @issue.Subject</option>
+            }
+        </select>
+
+        <InputNumber @bind-Value="plannedHours" placeholder="予定" />
+        <InputNumber @bind-Value="actualHours" placeholder="実工数" />
+        <button class="btn" @onclick="AddEntryAsync">追加</button>
+    </div>
+
+    <table class="daily-log__table">
+        <thead>
+            <tr>
+                <th>プロジェクト</th>
+                <th>ストーリー</th>
+                <th>タスク</th>
+                <th>予定</th>
+                <th>実工数</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (entries.Count == 0)
+            {
+                <tr>
+                    <td colspan="6">入力されたデータはありません。</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var entry in entries)
+                {
+                    <tr>
+                        <td>@entry.Project</td>
+                        <td>@entry.Story</td>
+                        <td>@entry.Task</td>
+                        <td>@entry.PlannedHours</td>
+                        <td>@entry.ActualHours</td>
+                        <td>
+                            <button class="btn" @onclick="() => DeleteEntryAsync(entry)">削除</button>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+
+    <div class="daily-log__entry">
+        <button class="btn" @onclick="RegisterSpentTimeToRedmineAsync" disabled="@isLoadingRedmine">一日の実工数をRedmineへ一括登録</button>
+    </div>
+</div>
+
+@code {
+    private DateTime workDate = DateTime.Today;
+    private string? startTime;
+    private string? endTime;
+    private WorkLog? currentLog;
+    private List<WorkLogEntry> entries = new();
+    private RedmineSettings redmineSettings = new();
+    private List<RedmineProject> redmineProjects = new();
+    private List<RedmineIssue> redmineStories = new();
+    private List<RedmineIssue> redmineTasks = new();
+    private int? selectedProjectId;
+    private int? selectedStoryIssueId;
+    private int? selectedTaskIssueId;
+    private decimal plannedHours;
+    private decimal actualHours;
+    private bool isLoadingRedmine;
+    private string? redmineStatusMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        redmineSettings = await DailyLogService.GetOrCreateRedmineSettingsAsync();
+        await LoadAsync();
+    }
+
+    private async Task OnWorkDateChanged(ChangeEventArgs args)
+    {
+        if (DateTime.TryParse(args?.Value?.ToString(), out var newDate))
+        {
+            workDate = newDate.Date;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        currentLog = await DailyLogService.GetOrCreateDailyLogAsync(workDate);
+        startTime = currentLog.StartTime;
+        endTime = currentLog.EndTime;
+        entries = await DailyLogService.GetEntriesAsync(currentLog.Id);
+    }
+
+    private async Task SaveHeaderAsync()
+    {
+        if (currentLog is null)
+        {
+            return;
+        }
+
+        currentLog.StartTime = startTime;
+        currentLog.EndTime = endTime;
+        await DailyLogService.SaveDailyLogAsync(currentLog);
+    }
+
+    private async Task AddEntryAsync()
+    {
+        if (currentLog is null)
+        {
+            return;
+        }
+
+        var selectedProject = redmineProjects.FirstOrDefault(x => x.Id == selectedProjectId);
+        if (selectedProject is null)
+        {
+            redmineStatusMessage = "プロジェクトを選択してください。";
+            return;
+        }
+
+        var selectedStory = redmineStories.FirstOrDefault(x => x.Id == selectedStoryIssueId);
+        var selectedTask = redmineTasks.FirstOrDefault(x => x.Id == selectedTaskIssueId);
+
+        var newEntry = new WorkLogEntry
+        {
+            WorkLogId = currentLog.Id,
+            Project = selectedProject.Name,
+            RedmineProjectId = selectedProject.Id,
+            Story = selectedStory is null ? string.Empty : $"#{selectedStory.Id} {selectedStory.Subject}",
+            RedmineStoryIssueId = selectedStory?.Id,
+            Task = selectedTask is null ? string.Empty : $"#{selectedTask.Id} {selectedTask.Subject}",
+            RedmineTaskIssueId = selectedTask?.Id,
+            PlannedHours = plannedHours,
+            ActualHours = actualHours
+        };
+
+        await DailyLogService.SaveEntryAsync(newEntry);
+        entries = await DailyLogService.GetEntriesAsync(currentLog.Id);
+        selectedStoryIssueId = null;
+        selectedTaskIssueId = null;
+        plannedHours = 0;
+        actualHours = 0;
+    }
+
+    private async Task DeleteEntryAsync(WorkLogEntry entry)
+    {
+        await DailyLogService.DeleteEntryAsync(entry);
+        if (currentLog is null)
+        {
+            return;
+        }
+
+        entries = await DailyLogService.GetEntriesAsync(currentLog.Id);
+    }
+
+    private async Task SaveRedmineSettingsAsync()
+    {
+        await DailyLogService.SaveRedmineSettingsAsync(redmineSettings);
+        redmineStatusMessage = "Redmine設定を保存しました。";
+    }
+
+    private async Task RegisterSpentTimeToRedmineAsync()
+    {
+        if (currentLog is null)
+        {
+            return;
+        }
+
+        isLoadingRedmine = true;
+        redmineStatusMessage = null;
+
+        try
+        {
+            await DailyLogService.SaveRedmineSettingsAsync(redmineSettings);
+            var drafts = BuildTimeEntryDrafts(entries);
+
+            if (drafts.Count == 0)
+            {
+                redmineStatusMessage = "送信対象の実工数がありません。タスクまたはストーリーに紐づいた実工数を入力してください。";
+                return;
+            }
+
+            var result = await RedmineService.RegisterSpentTimeBulkAsync(redmineSettings, workDate, drafts);
+            redmineStatusMessage = result.Errors.Count == 0
+                ? $"{result.SuccessCount} 件の実工数をRedmineへ登録しました。"
+                : $"{result.SuccessCount} 件登録 / {result.Errors.Count} 件失敗: {string.Join(" | ", result.Errors)}";
+        }
+        catch (Exception ex)
+        {
+            redmineStatusMessage = $"実工数登録に失敗しました: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingRedmine = false;
+        }
+    }
+
+    private async Task LoadProjectsAsync()
+    {
+        isLoadingRedmine = true;
+        redmineStatusMessage = null;
+
+        try
+        {
+            await DailyLogService.SaveRedmineSettingsAsync(redmineSettings);
+            redmineProjects = await RedmineService.GetProjectsAsync(redmineSettings);
+            redmineStatusMessage = $"プロジェクトを {redmineProjects.Count} 件取得しました。";
+
+            if (selectedProjectId.HasValue)
+            {
+                await LoadIssuesForSelectedProjectAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            redmineStatusMessage = $"Redmine取得に失敗しました: {ex.Message}";
+            redmineStories.Clear();
+            redmineTasks.Clear();
+        }
+        finally
+        {
+            isLoadingRedmine = false;
+        }
+    }
+
+    private async Task OnProjectChangedAsync(ChangeEventArgs args)
+    {
+        selectedProjectId = ParseNullableInt(args?.Value?.ToString());
+        await LoadIssuesForSelectedProjectAsync();
+    }
+
+    private void OnStoryChanged(ChangeEventArgs args)
+    {
+        selectedStoryIssueId = ParseNullableInt(args?.Value?.ToString());
+    }
+
+    private void OnTaskChanged(ChangeEventArgs args)
+    {
+        selectedTaskIssueId = ParseNullableInt(args?.Value?.ToString());
+    }
+
+    private async Task LoadIssuesForSelectedProjectAsync()
+    {
+        selectedStoryIssueId = null;
+        selectedTaskIssueId = null;
+
+        if (!selectedProjectId.HasValue)
+        {
+            redmineStories.Clear();
+            redmineTasks.Clear();
+            return;
+        }
+
+        isLoadingRedmine = true;
+        redmineStatusMessage = null;
+
+        try
+        {
+            var issues = await RedmineService.GetIssuesForProjectAsync(redmineSettings, selectedProjectId.Value);
+            redmineStories = issues.Stories;
+            redmineTasks = issues.Tasks;
+            redmineStatusMessage = $"ストーリー {redmineStories.Count} 件 / タスク {redmineTasks.Count} 件を取得しました。";
+        }
+        catch (Exception ex)
+        {
+            redmineStatusMessage = $"チケット取得に失敗しました: {ex.Message}";
+            redmineStories.Clear();
+            redmineTasks.Clear();
+        }
+        finally
+        {
+            isLoadingRedmine = false;
+        }
+    }
+
+    private static int? ParseNullableInt(string? raw)
+    {
+        return int.TryParse(raw, out var value) ? value : null;
+    }
+
+    private static List<RedmineTimeEntryDraft> BuildTimeEntryDrafts(IEnumerable<WorkLogEntry> sourceEntries)
+    {
+        var grouped = sourceEntries
+            .Where(entry => entry.ActualHours > 0)
+            .Select(entry => new
+            {
+                IssueId = entry.RedmineTaskIssueId ?? entry.RedmineStoryIssueId,
+                entry.ActualHours,
+                entry.Project,
+                entry.Story,
+                entry.Task
+            })
+            .Where(entry => entry.IssueId.HasValue)
+            .GroupBy(entry => entry.IssueId!.Value)
+            .Select(group => new RedmineTimeEntryDraft(
+                group.Key,
+                group.Sum(x => x.ActualHours),
+                BuildTimeEntryComment(group.First().Project, group.First().Story, group.First().Task)))
+            .ToList();
+
+        return grouped;
+    }
+
+    private static string BuildTimeEntryComment(string project, string story, string task)
+    {
+        var commentParts = new List<string> { "SyncTask登録" };
+
+        if (!string.IsNullOrWhiteSpace(project))
+        {
+            commentParts.Add($"PJ:{project}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(story))
+        {
+            commentParts.Add($"Story:{story}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(task))
+        {
+            commentParts.Add($"Task:{task}");
+        }
+
+        return string.Join(" / ", commentParts);
+    }
+}
