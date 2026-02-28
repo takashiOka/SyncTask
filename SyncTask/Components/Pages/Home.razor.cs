@@ -27,6 +27,8 @@ public partial class Home
     private bool isLoadingRedmine;
     private string? redmineStatusMessage;
     private string generatedMailBody = string.Empty;
+    private WorkLogEntry? draggedEntry;
+    private WorkLogEntry? dragTargetEntry;
 
     protected override async Task OnInitializedAsync()
     {
@@ -352,6 +354,92 @@ public partial class Home
         }
     }
 
+    private void HandleDragStart(WorkLogEntry entry)
+    {
+        Console.WriteLine($"Drag started: EntryId={entry.Id}, Project={entry.Project}, Story={entry.Story}, Task={entry.Task}");
+        if (IsEntryEmpty(entry))
+        {
+            draggedEntry = null;
+            dragTargetEntry = null;
+            return;
+        }
+
+        draggedEntry = entry;
+        dragTargetEntry = entry;
+    }
+
+    private void HandleDragEnter(WorkLogEntry entry)
+    {
+        Console.WriteLine($"Drag entered: EntryId={entry.Id}, Project={entry.Project}, Story={entry.Story}, Task={entry.Task}");
+        if (draggedEntry is null || IsEntryEmpty(entry))
+        {
+            return;
+        }
+
+        dragTargetEntry = entry;
+    }
+
+    private void HandleDragEnd()
+    {
+        Console.WriteLine($"Drag ended: EntryId={draggedEntry?.Id}, Project={draggedEntry?.Project}, Story={draggedEntry?.Story}, Task={draggedEntry?.Task}");
+        draggedEntry = null;
+        dragTargetEntry = null;
+    }
+
+    private async Task HandleDrop()
+    {
+        Console.WriteLine($"Handling drop: DraggedEntryId={draggedEntry?.Id}, DragTargetEntryId={dragTargetEntry?.Id}");
+        if (draggedEntry is null || dragTargetEntry is null || ReferenceEquals(draggedEntry, dragTargetEntry))
+        {
+            HandleDragEnd();
+            return;
+        }
+
+        var draggedIndex = entries.IndexOf(draggedEntry);
+        var targetIndex = entries.IndexOf(dragTargetEntry);
+        if (draggedIndex < 0 || targetIndex < 0)
+        {
+            HandleDragEnd();
+            return;
+        }
+
+        entries.RemoveAt(draggedIndex);
+        if (draggedIndex < targetIndex)
+        {
+            targetIndex--;
+        }
+
+        entries.Insert(targetIndex, draggedEntry);
+        RecalculateStartTimesFrom(0);
+
+        if (currentLog is not null)
+        {
+            foreach (var entry in entries.Where(entry => !IsEntryEmpty(entry)))
+            {
+                entry.WorkLogId = currentLog.Id;
+                await DailyLogService.SaveEntryAsync(entry);
+            }
+        }
+
+        EnsureTrailingEmptyRow();
+        HandleDragEnd();
+    }
+
+    private string GetRowClass(WorkLogEntry entry)
+    {
+        if (ReferenceEquals(entry, draggedEntry))
+        {
+            return "dragging";
+        }
+
+        if (draggedEntry is not null && ReferenceEquals(entry, dragTargetEntry))
+        {
+            return "drag-over";
+        }
+
+        return string.Empty;
+    }
+
     private static string GetProjectSelectValue(WorkLogEntry entry)
     {
         return IsBreakEntry(entry)
@@ -465,8 +553,19 @@ public partial class Home
 
     private void RecalculateStartTimesFrom(int startRowIndex)
     {
-        if (startRowIndex < 1)
+        if (entries.Count == 0)
         {
+            return;
+        }
+
+        if (startRowIndex < 0)
+        {
+            startRowIndex = 0;
+        }
+
+        if (startRowIndex == 0)
+        {
+            RecalculateGridEntry(entries[0]);
             startRowIndex = 1;
         }
 

@@ -76,39 +76,47 @@
 
 /* --- 各列の幅指定 --- */
 
-/* 1. プロジェクト / 2. ストーリー / 3. タスク (可変列) */
+/* 1. ドラッグハンドル列 */
 .daily-log__table th:nth-child(1),
-.daily-log__table td:nth-child(1),
+.daily-log__table td:nth-child(1) {
+  width: 22px;
+  min-width: 22px;
+  text-align: center;
+}
+
+/* 2. プロジェクト / 3. ストーリー / 4. タスク (可変列) */
 .daily-log__table th:nth-child(2),
 .daily-log__table td:nth-child(2),
 .daily-log__table th:nth-child(3),
-.daily-log__table td:nth-child(3) {
+.daily-log__table td:nth-child(3),
+.daily-log__table th:nth-child(4),
+.daily-log__table td:nth-child(4) {
   min-width: 180px; /* 極端に潰れないように最小幅を確保 */
 }
 
-/* 4. 開始時間 / 6. 終了予定 / 7. 実終了 */
-.daily-log__table th:nth-child(4),
-.daily-log__table td:nth-child(4),
-.daily-log__table th:nth-child(6),
-.daily-log__table td:nth-child(6),
+/* 5. 開始時間 / 7. 終了予定 / 8. 実終了 */
+.daily-log__table th:nth-child(5),
+.daily-log__table td:nth-child(5),
 .daily-log__table th:nth-child(7),
-.daily-log__table td:nth-child(7) {
+.daily-log__table td:nth-child(7),
+.daily-log__table th:nth-child(8),
+.daily-log__table td:nth-child(8) {
   width: 75px;
   min-width: 75px;
 }
 
-/* 5. 予定 / 8. 実工数 (固定幅) */
-.daily-log__table th:nth-child(5),
-.daily-log__table td:nth-child(5),
-.daily-log__table th:nth-child(8),
-.daily-log__table td:nth-child(8) {
+/* 6. 予定 / 9. 実工数 (固定幅) */
+.daily-log__table th:nth-child(6),
+.daily-log__table td:nth-child(6),
+.daily-log__table th:nth-child(9),
+.daily-log__table td:nth-child(9) {
   width: 60px;
   min-width: 60px;
 }
 
-/* 9. 削除ボタン列 */
-.daily-log__table th:nth-child(9),
-.daily-log__table td:nth-child(9) {
+/* 10. 削除ボタン列 */
+.daily-log__table th:nth-child(10),
+.daily-log__table td:nth-child(10) {
   width: 50px;
   text-align: center;
 }
@@ -127,6 +135,30 @@
 
 .daily-log__table tbody tr:hover {
   background: rgba(219, 234, 254, 0.28);
+}
+
+.drag-handle {
+  color: rgba(148, 163, 184, 0.9);
+  cursor: grab;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.drag-handle:hover {
+  color: rgba(100, 116, 139, 0.95);
+}
+
+tr:active .drag-handle {
+  cursor: grabbing;
+}
+
+.daily-log__table tbody tr.dragging {
+  opacity: 0.5;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+}
+
+.daily-log__table tbody tr.drag-over {
+  border-top: 2px solid rgba(37, 99, 235, 0.9);
 }
 
 .daily-log__table input,

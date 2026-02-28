@@ -26,6 +26,7 @@
                 <table class="daily-log__table">
                     <thead>
                         <tr>
+                            <th></th>
                             <th>プロジェクト</th>
                             <th>ストーリー</th>
                             <th>タスク</th>
@@ -44,7 +45,18 @@
                             var stories = GetStoryOptions(entry);
                             var tasks = GetTaskOptions(entry);
 
-                            <tr @key="entry">
+                            <tr @key="entry"
+                                class="@GetRowClass(entry)"
+                                draggable="true"
+                                @ondragstart="@(() => HandleDragStart(entry))"
+                                @ondragenter="@(() => HandleDragEnter(entry))"
+                                @ondragover="@((Microsoft.AspNetCore.Components.Web.DragEventArgs _) => { })"
+                                @ondragover:preventDefault="true"
+                                @ondragend="HandleDragEnd"
+                                @ondrop="HandleDrop">
+                                <td>
+                                    <i class="bi bi-grip-vertical drag-handle"></i>
+                                </td>
                                 <td>
                                     <select value="@GetProjectSelectValue(entry)"
                                             @onchange="async args => await OnGridProjectChangedAsync(entry, args)"
