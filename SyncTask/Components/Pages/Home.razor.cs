@@ -328,13 +328,16 @@ public partial class Home
 
     private IReadOnlyList<RedmineIssue> GetTaskOptions(WorkLogEntry entry)
     {
-        if (!entry.RedmineProjectId.HasValue)
+        if (!entry.RedmineProjectId.HasValue || !entry.RedmineStoryIssueId.HasValue)
         {
             return Array.Empty<RedmineIssue>();
         }
 
         return projectIssueCache.TryGetValue(entry.RedmineProjectId.Value, out var split)
             ? split.Tasks
+                .Where(issue => issue.Parent?.Id == entry.RedmineStoryIssueId.Value)
+                .OrderBy(issue => issue.Id)
+                .ToList()
             : Array.Empty<RedmineIssue>();
     }
 
@@ -663,11 +666,46 @@ public partial class Home
             : (entry.RedmineProjectId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty);
     }
 
+    private static string GetProjectSelectTitle(WorkLogEntry entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry.Project))
+        {
+            return "プロジェクトを選択";
+        }
+
+        return entry.Project;
+    }
+
+    private static string GetStorySelectTitle(WorkLogEntry entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry.Story))
+        {
+            return "ストーリーを選択";
+        }
+
+        return entry.Story;
+    }
+
+    private static string GetTaskSelectTitle(WorkLogEntry entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry.Task))
+        {
+            return "タスクを選択";
+        }
+
+        return entry.Task;
+    }
+
     private void OnGridStoryChanged(WorkLogEntry entry, ChangeEventArgs args)
     {
         entry.RedmineStoryIssueId = ParseNullableInt(args?.Value?.ToString());
         var selectedStory = GetStoryOptions(entry).FirstOrDefault(x => x.Id == entry.RedmineStoryIssueId);
         entry.Story = selectedStory is null ? string.Empty : $"#{selectedStory.Id} {selectedStory.Subject}";
+
+        entry.RedmineTaskIssueId = null;
+        entry.Task = string.Empty;
+        entry.RedmineTaskIsClosed = null;
+        entry.TaskStatusLabel = string.Empty;
     }
 
     private void OnGridTaskChanged(WorkLogEntry entry, ChangeEventArgs args)

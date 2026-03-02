@@ -54,6 +54,7 @@
                                 </td>
                                 <td>
                                     <select value="@GetProjectSelectValue(entry)"
+                                            title="@GetProjectSelectTitle(entry)"
                                             @onchange="async args => await OnGridProjectChangedAsync(entry, args)"
                                             @onblur="async _ => await SaveGridRowAsync(entry)">
                                         <option value="">プロジェクトを選択</option>
@@ -66,6 +67,7 @@
                                 </td>
                                 <td>
                                     <select value="@(entry.RedmineStoryIssueId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
+                                            title="@GetStorySelectTitle(entry)"
                                             @onchange="args => OnGridStoryChanged(entry, args)"
                                             @onblur="async _ => await SaveGridRowAsync(entry)"
                                             disabled="@(!entry.RedmineProjectId.HasValue)">
@@ -78,9 +80,10 @@
                                 </td>
                                 <td>
                                     <select value="@(entry.RedmineTaskIssueId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
+                                            title="@GetTaskSelectTitle(entry)"
                                             @onchange="args => OnGridTaskChanged(entry, args)"
                                             @onblur="async _ => await SaveGridRowAsync(entry)"
-                                            disabled="@(!entry.RedmineProjectId.HasValue)">
+                                            disabled="@(!entry.RedmineProjectId.HasValue || !entry.RedmineStoryIssueId.HasValue)">
                                         <option value="">タスクを選択</option>
                                         @foreach (var issue in tasks)
                                         {

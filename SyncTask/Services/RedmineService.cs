@@ -20,7 +20,10 @@ public class RedmineService
         response.EnsureSuccessStatusCode();
 
         var payload = await response.Content.ReadFromJsonAsync<RedmineProjectsResponse>(cancellationToken: cancellationToken);
-        return payload?.Projects?.OrderBy(p => p.Name).ToList() ?? new List<RedmineProject>();
+        return payload?.Projects?
+            .Where(p => p.Status == RedmineProjectStatus.Active)
+            .OrderBy(p => p.Name)
+            .ToList() ?? new List<RedmineProject>();
     }
 
     public async Task<RedmineIssueSplitResult> GetIssuesForProjectAsync(
@@ -225,6 +228,15 @@ public sealed class RedmineProject
     public string Name { get; set; } = string.Empty;
 
     public string Identifier { get; set; } = string.Empty;
+
+    public RedmineProjectStatus Status { get; set; }
+}
+
+public enum RedmineProjectStatus
+{
+    Active = 1,
+    Closed = 5,
+    Archived = 9
 }
 
 public sealed class RedmineIssuesResponse
@@ -250,6 +262,8 @@ public sealed class RedmineIssue
     public string Subject { get; set; } = string.Empty;
 
     public RedmineNamedValue? Tracker { get; set; }
+
+    public RedmineNamedValue? Parent { get; set; }
 
     public RedmineIssueStatus? Status { get; set; }
 }
