@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
+using Microsoft.Maui.ApplicationModel;
 using SyncTask.Data;
 using SyncTask.Services;
 using WebDragEventArgs = Microsoft.AspNetCore.Components.Web.DragEventArgs;
@@ -701,6 +702,60 @@ public partial class Home
         }
 
         return entry.Task;
+    }
+
+    private string? GetProjectLinkUrl(WorkLogEntry entry)
+    {
+        if (!entry.RedmineProjectId.HasValue)
+        {
+            return null;
+        }
+
+        return BuildRedmineUrl($"projects/{entry.RedmineProjectId.Value}");
+    }
+
+    private string? GetIssueLinkUrl(int? issueId)
+    {
+        if (!issueId.HasValue)
+        {
+            return null;
+        }
+
+        return BuildRedmineUrl($"issues/{issueId.Value}");
+    }
+
+    private string? BuildRedmineUrl(string relativePath)
+    {
+        var baseUrl = redmineSettings.BaseUrl?.Trim();
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return null;
+        }
+
+        if (!Uri.TryCreate(baseUrl.EndsWith('/') ? baseUrl : $"{baseUrl}/", UriKind.Absolute, out var baseUri))
+        {
+            return null;
+        }
+
+        return new Uri(baseUri, relativePath).ToString();
+    }
+
+    private async Task OpenRedmineLinkAsync(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            redmineStatusMessage = "Redmine URL が未設定です。設定画面で Base URL を保存してください。";
+            return;
+        }
+
+        try
+        {
+            await Launcher.Default.OpenAsync(url);
+        }
+        catch (Exception ex)
+        {
+            redmineStatusMessage = $"リンクを開けませんでした: {ex.Message}";
+        }
     }
 
     private void OnGridStoryChanged(WorkLogEntry entry, ChangeEventArgs args)

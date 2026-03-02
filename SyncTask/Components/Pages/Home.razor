@@ -10,7 +10,8 @@
         <div class="daily-page__badges">
             <span class="daily-badge">対象日 @workDate.ToString("yyyy/MM/dd")</span>
             <span class="daily-badge">タスク @entries.Count(x => !IsEntryEmpty(x)) 件</span>
-            <span class="daily-badge">実工数 @FormatHours(entries.Sum(x => x.ActualHours)) h</span>
+            <span class="daily-badge">作業時間 @FormatHours(entries.Where(x => !IsBreakEntry(x)).Sum(x => x.ActualHours)) h</span>
+            <span class="daily-badge">休憩時間 @FormatHours(entries.Where(x => IsBreakEntry(x)).Sum(x => x.ActualHours)) h</span>
         </div>
     </section>
 
@@ -54,43 +55,73 @@
                                         onpointerdown="window.syncTaskDnd && window.syncTaskDnd.startPointerDrag(event)"></i>
                                 </td>
                                 <td>
-                                    <select value="@GetProjectSelectValue(entry)"
-                                            title="@GetProjectSelectTitle(entry)"
-                                            @onchange="async args => await OnGridProjectChangedAsync(entry, args)"
-                                            @onblur="async _ => await SaveGridRowAsync(entry)">
-                                        <option value="">プロジェクトを選択</option>
-                                        <option value="@BreakProjectOptionValue">@BreakProjectName</option>
-                                        @foreach (var project in GetProjectOptions(entry))
-                                        {
-                                            <option value="@project.Id" selected="@(entry.RedmineProjectId == project.Id)">@project.Name</option>
-                                        }
-                                    </select>
+                                    <div class="daily-inline-field">
+                                        <select value="@GetProjectSelectValue(entry)"
+                                                title="@GetProjectSelectTitle(entry)"
+                                                @onchange="async args => await OnGridProjectChangedAsync(entry, args)"
+                                                @onblur="async _ => await SaveGridRowAsync(entry)">
+                                            <option value="">プロジェクトを選択</option>
+                                            <option value="@BreakProjectOptionValue">@BreakProjectName</option>
+                                            @foreach (var project in GetProjectOptions(entry))
+                                            {
+                                                <option value="@project.Id" selected="@(entry.RedmineProjectId == project.Id)">@project.Name</option>
+                                            }
+                                        </select>
+                                        <button type="button"
+                                                class="btn btn--ghost daily-link-btn"
+                                                title="Redmineプロジェクトを開く"
+                                                aria-label="Redmineプロジェクトを開く"
+                                                @onclick="() => OpenRedmineLinkAsync(GetProjectLinkUrl(entry))"
+                                                disabled="@string.IsNullOrWhiteSpace(GetProjectLinkUrl(entry))">
+                                            <i class="bi bi-box-arrow-up-right"></i>
+                                        </button>
+                                    </div>
                                 </td>
                                 <td>
-                                    <select value="@(entry.RedmineStoryIssueId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
-                                            title="@GetStorySelectTitle(entry)"
-                                            @onchange="args => OnGridStoryChanged(entry, args)"
-                                            @onblur="async _ => await SaveGridRowAsync(entry)"
-                                            disabled="@(!entry.RedmineProjectId.HasValue)">
-                                        <option value="">ストーリーを選択</option>
-                                        @foreach (var issue in stories)
-                                        {
-                                            <option value="@issue.Id" title="@issue.Id @issue.Subject">#@issue.Id @issue.Subject</option>
-                                        }
-                                    </select>
+                                    <div class="daily-inline-field">
+                                        <select value="@(entry.RedmineStoryIssueId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
+                                                title="@GetStorySelectTitle(entry)"
+                                                @onchange="args => OnGridStoryChanged(entry, args)"
+                                                @onblur="async _ => await SaveGridRowAsync(entry)"
+                                                disabled="@(!entry.RedmineProjectId.HasValue)">
+                                            <option value="">ストーリーを選択</option>
+                                            @foreach (var issue in stories)
+                                            {
+                                                <option value="@issue.Id" title="@issue.Id @issue.Subject">#@issue.Id @issue.Subject</option>
+                                            }
+                                        </select>
+                                        <button type="button"
+                                                class="btn btn--ghost daily-link-btn"
+                                                title="Redmineストーリーを開く"
+                                                aria-label="Redmineストーリーを開く"
+                                                @onclick="() => OpenRedmineLinkAsync(GetIssueLinkUrl(entry.RedmineStoryIssueId))"
+                                                disabled="@(!entry.RedmineStoryIssueId.HasValue)">
+                                            <i class="bi bi-box-arrow-up-right"></i>
+                                        </button>
+                                    </div>
                                 </td>
                                 <td>
-                                    <select value="@(entry.RedmineTaskIssueId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
-                                            title="@GetTaskSelectTitle(entry)"
-                                            @onchange="args => OnGridTaskChanged(entry, args)"
-                                            @onblur="async _ => await SaveGridRowAsync(entry)"
-                                            disabled="@(!entry.RedmineProjectId.HasValue || !entry.RedmineStoryIssueId.HasValue)">
-                                        <option value="">タスクを選択</option>
-                                        @foreach (var issue in tasks)
-                                        {
-                                            <option value="@issue.Id" title="@issue.Id @issue.Subject">#@issue.Id @issue.Subject</option>
-                                        }
-                                    </select>
+                                    <div class="daily-inline-field">
+                                        <select value="@(entry.RedmineTaskIssueId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
+                                                title="@GetTaskSelectTitle(entry)"
+                                                @onchange="args => OnGridTaskChanged(entry, args)"
+                                                @onblur="async _ => await SaveGridRowAsync(entry)"
+                                                disabled="@(!entry.RedmineProjectId.HasValue || !entry.RedmineStoryIssueId.HasValue)">
+                                            <option value="">タスクを選択</option>
+                                            @foreach (var issue in tasks)
+                                            {
+                                                <option value="@issue.Id" title="@issue.Id @issue.Subject">#@issue.Id @issue.Subject</option>
+                                            }
+                                        </select>
+                                        <button type="button"
+                                                class="btn btn--ghost daily-link-btn"
+                                                title="Redmineタスクを開く"
+                                                aria-label="Redmineタスクを開く"
+                                                @onclick="() => OpenRedmineLinkAsync(GetIssueLinkUrl(entry.RedmineTaskIssueId))"
+                                                disabled="@(!entry.RedmineTaskIssueId.HasValue)">
+                                            <i class="bi bi-box-arrow-up-right"></i>
+                                        </button>
+                                    </div>
                                 </td>
                                 <td class="daily-grid-cell--plan">
                                     <input type="number"

@@ -1,3 +1,5 @@
 <Solution>
-  <Project Path="SyncTask/SyncTask.csproj" />
+  <Project Path="SyncTask/SyncTask.csproj">
+    <Deploy Solution="Debug|*" />
+  </Project>
 </Solution>

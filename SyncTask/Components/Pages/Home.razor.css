@@ -74,6 +74,32 @@
   padding: 0.2rem 0.2rem;
 }
 
+.daily-inline-field {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.daily-inline-field > select {
+  flex: 1;
+  min-width: 0;
+}
+
+.daily-link-btn {
+  width: 1.35rem;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.daily-link-btn i {
+  font-size: 0.72rem;
+}
+
 /* --- 各列の幅指定 --- */
 
 /* 1. ドラッグハンドル列 */
@@ -272,7 +298,6 @@ tr:active .drag-handle {
   text-align: center;
 }
 
-,
 .daily-grid-cell--readonly {
   color: #334155;
   font-weight: 600;
