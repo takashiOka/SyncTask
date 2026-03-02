@@ -117,8 +117,25 @@
 /* 10. 削除ボタン列 */
 .daily-log__table th:nth-child(10),
 .daily-log__table td:nth-child(10) {
-  width: 50px;
+  width: 62px;
+  min-width: 62px;
   text-align: center;
+}
+
+.daily-row-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.daily-action-btn {
+  width: 1.7rem;
+  min-width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* セレクトボックスの文字切れ対策 */
@@ -163,8 +180,12 @@ tr:active .drag-handle {
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
 }
 
-.daily-log__table tbody tr.drag-over td {
+.daily-log__table tbody tr.drag-over-top td {
   border-top: 2px solid rgba(37, 99, 235, 0.9);
+}
+
+.daily-log__table tbody tr.drag-over-bottom td {
+  border-bottom: 2px solid rgba(37, 99, 235, 0.9);
 }
 
 .daily-log__table input,

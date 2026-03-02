@@ -32,8 +32,8 @@ public partial class Home
     private string generatedMailBody = string.Empty;
     private WorkLogEntry? draggedEntry;
     private WorkLogEntry? dragTargetEntry;
+    private int? dragInsertIndex;
     private DotNetObjectReference<Home>? dotNetRef;
-    private bool isDragging;
 
     protected override async Task OnInitializedAsync()
     {
@@ -87,6 +87,30 @@ public partial class Home
         }
 
         EnsureTrailingEmptyRow();
+    }
+
+    private Task InsertGridRowAsync(WorkLogEntry entry)
+    {
+        var insertAfterIndex = entries.IndexOf(entry);
+        if (insertAfterIndex < 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var inheritedStart = entry.ActualEndTime;
+        var inserted = new WorkLogEntry
+        {
+            StartTime = inheritedStart,
+            ActualEndTime = inheritedStart
+        };
+
+        var insertIndex = insertAfterIndex + 1;
+        entries.Insert(insertIndex, inserted);
+        RecalculateGridEntry(inserted);
+        RecalculateStartTimesFrom(insertIndex + 1);
+        EnsureTrailingEmptyRow();
+
+        return Task.CompletedTask;
     }
 
     private Task GenerateMailBodyAsync()
@@ -386,7 +410,6 @@ public partial class Home
             return Task.CompletedTask;
         }
 
-        isDragging = true;
         draggedEntry = sourceEntry;
         dragTargetEntry = sourceEntry;
         LogDragState($"pointer-start index={sourceIndex}");
@@ -397,9 +420,9 @@ public partial class Home
     public async Task NotifyPointerDragCancel()
     {
         LogDragState("pointer-cancel");
-        isDragging = false;
         draggedEntry = null;
         dragTargetEntry = null;
+        dragInsertIndex = null;
         await InvokeAsync(StateHasChanged);
     }
 
@@ -417,16 +440,25 @@ public partial class Home
             return Task.CompletedTask;
         }
 
-        var targetEntry = entries[targetIndex];
-        if (IsEntryEmpty(targetEntry))
+        var insertIndex = ComputeInsertIndex(targetIndex);
+        if (!insertIndex.HasValue)
         {
             return Task.CompletedTask;
         }
+
+        var targetEntry = entries[targetIndex];
 
         if (!ReferenceEquals(dragTargetEntry, targetEntry))
         {
             dragTargetEntry = targetEntry;
             LogDragState($"dragover-target-set index={targetIndex}");
+            _ = InvokeAsync(StateHasChanged);
+        }
+
+        if (dragInsertIndex != insertIndex.Value)
+        {
+            dragInsertIndex = insertIndex.Value;
+            LogDragState($"dragover-insert-index set={dragInsertIndex.Value}");
             _ = InvokeAsync(StateHasChanged);
         }
 
@@ -441,49 +473,66 @@ public partial class Home
         if (targetIndex < 0 || targetIndex >= entries.Count)
         {
             LogDragState($"drop-ignore-out-of-range index={targetIndex}");
-            isDragging = false;
             draggedEntry = null;
             dragTargetEntry = null;
+            dragInsertIndex = null;
             await InvokeAsync(StateHasChanged);
             return;
         }
 
         dragTargetEntry = entries[targetIndex];
-        await HandleDropCoreAsync();
+        var insertIndex = ComputeInsertIndex(targetIndex);
+        if (!insertIndex.HasValue)
+        {
+            LogDragState($"drop-ignore-invalid-insert-index target={targetIndex}");
+            draggedEntry = null;
+            dragTargetEntry = null;
+            dragInsertIndex = null;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        dragInsertIndex = insertIndex.Value;
+        await HandleDropCoreAsync(insertIndex.Value);
     }
 
-    private async Task HandleDropCoreAsync()
+    private async Task HandleDropCoreAsync(int insertIndex)
     {
         LogDragState("drop-before-validate");
         if (draggedEntry is null || dragTargetEntry is null || ReferenceEquals(draggedEntry, dragTargetEntry))
         {
             LogDragState("drop-cancel-invalid-state");
-            isDragging = false;
             draggedEntry = null;
             dragTargetEntry = null;
+            dragInsertIndex = null;
             await InvokeAsync(StateHasChanged);
             return;
         }
 
         var draggedIndex = entries.IndexOf(draggedEntry);
-        var targetIndex = entries.IndexOf(dragTargetEntry);
-        if (draggedIndex < 0 || targetIndex < 0)
+        if (draggedIndex < 0)
         {
-            LogDragState($"drop-cancel-index-missing draggedIndex={draggedIndex} targetIndex={targetIndex}");
-            isDragging = false;
+            LogDragState($"drop-cancel-index-missing draggedIndex={draggedIndex} insertIndex={insertIndex}");
             draggedEntry = null;
             dragTargetEntry = null;
+            dragInsertIndex = null;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        if (insertIndex < 0 || insertIndex > entries.Count - 1)
+        {
+            LogDragState($"drop-cancel-insert-out-of-range insertIndex={insertIndex} entriesCount={entries.Count}");
+            draggedEntry = null;
+            dragTargetEntry = null;
+            dragInsertIndex = null;
             await InvokeAsync(StateHasChanged);
             return;
         }
 
         entries.RemoveAt(draggedIndex);
-        if (draggedIndex < targetIndex)
-        {
-            targetIndex--;
-        }
 
-        entries.Insert(targetIndex, draggedEntry);
+        entries.Insert(insertIndex, draggedEntry);
         RecalculateStartTimesFrom(0);
 
         if (currentLog is not null)
@@ -496,11 +545,61 @@ public partial class Home
         }
 
         EnsureTrailingEmptyRow();
-        LogDragState($"drop-committed draggedIndex={draggedIndex} targetIndex={targetIndex}");
-        isDragging = false;
+        LogDragState($"drop-committed draggedIndex={draggedIndex} insertIndex={insertIndex}");
         draggedEntry = null;
         dragTargetEntry = null;
+        dragInsertIndex = null;
         await InvokeAsync(StateHasChanged);
+    }
+
+    private int? ComputeInsertIndex(int targetIndex)
+    {
+        if (draggedEntry is null)
+        {
+            return null;
+        }
+
+        if (targetIndex < 0 || targetIndex >= entries.Count)
+        {
+            return null;
+        }
+
+        var draggedIndex = entries.IndexOf(draggedEntry);
+        if (draggedIndex < 0)
+        {
+            return null;
+        }
+
+        var effectiveTargetIndex = targetIndex;
+        if (IsEntryEmpty(entries[effectiveTargetIndex]))
+        {
+            while (effectiveTargetIndex >= 0 && IsEntryEmpty(entries[effectiveTargetIndex]))
+            {
+                effectiveTargetIndex--;
+            }
+
+            if (effectiveTargetIndex < 0)
+            {
+                return null;
+            }
+        }
+
+        var insertIndex = draggedIndex < effectiveTargetIndex
+            ? effectiveTargetIndex + 1
+            : effectiveTargetIndex;
+
+        var maxInsertIndex = entries.Count - 1;
+        if (insertIndex > maxInsertIndex)
+        {
+            insertIndex = maxInsertIndex;
+        }
+
+        if (draggedIndex < insertIndex)
+        {
+            insertIndex--;
+        }
+
+        return Math.Max(0, insertIndex);
     }
 
     private void LogDragEvent(string stage, WorkLogEntry? entry, WebDragEventArgs? args)
@@ -519,26 +618,42 @@ public partial class Home
     private void LogDragState(string stage)
     {
         var message =
-            $"[DND-STATE:{stage}] draggedEntryId={draggedEntry?.Id} dragTargetEntryId={dragTargetEntry?.Id} entriesCount={entries.Count}";
+            $"[DND-STATE:{stage}] draggedEntryId={draggedEntry?.Id} dragTargetEntryId={dragTargetEntry?.Id} dragInsertIndex={dragInsertIndex?.ToString() ?? ""} entriesCount={entries.Count}";
 
         Console.WriteLine(message);
         System.Diagnostics.Debug.WriteLine(message);
         Logger.LogInformation(message);
     }
 
-    private string GetRowClass(WorkLogEntry entry)
+    private string GetRowClass(WorkLogEntry entry, int index)
     {
         if (ReferenceEquals(entry, draggedEntry))
         {
             return "dragging";
         }
 
-        if (draggedEntry is not null && ReferenceEquals(entry, dragTargetEntry))
+        if (draggedEntry is null || !dragInsertIndex.HasValue)
         {
-            return "drag-over";
+            return string.Empty;
         }
 
-        return string.Empty;
+        if (dragInsertIndex.Value != index)
+        {
+            return string.Empty;
+        }
+
+        var draggedIndex = entries.IndexOf(draggedEntry);
+        if (draggedIndex < 0)
+        {
+            return string.Empty;
+        }
+
+        if (dragInsertIndex.Value > draggedIndex)
+        {
+            return "drag-over-bottom";
+        }
+
+        return "drag-over-top";
     }
 
     private static string GetProjectSelectValue(WorkLogEntry entry)

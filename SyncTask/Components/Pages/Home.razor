@@ -47,7 +47,7 @@
 
                             <tr @key="entry"
                                 data-row-index="@index"
-                                class="@GetRowClass(entry)">
+                                class="@GetRowClass(entry, index)">
                                 <td>
                                     <i class="bi bi-grip-vertical drag-handle"
                                         onpointerdown="window.syncTaskDnd && window.syncTaskDnd.startPointerDrag(event)"></i>
@@ -124,7 +124,20 @@
                                 <td>
                                     @if (!IsEntryEmpty(entry))
                                     {
-                                        <button class="btn btn--danger" @onclick="() => DeleteGridRowAsync(entry)">削除</button>
+                                        <div class="daily-row-actions">
+                                            <button class="btn btn--ghost daily-action-btn"
+                                                    title="行を挿入"
+                                                    aria-label="行を挿入"
+                                                    @onclick="() => InsertGridRowAsync(entry)">
+                                                <i class="bi bi-plus-lg"></i>
+                                            </button>
+                                            <button class="btn btn--danger daily-action-btn"
+                                                    title="行を削除"
+                                                    aria-label="行を削除"
+                                                    @onclick="() => DeleteGridRowAsync(entry)">
+                                                <i class="bi bi-trash3"></i>
+                                            </button>
+                                        </div>
                                     }
                                 </td>
                             </tr>
