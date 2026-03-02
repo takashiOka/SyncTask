@@ -22,9 +22,11 @@ public partial class Home
     private const string BreakProjectOptionValue = "__BREAK_PRIVATE__";
     private const string BreakProjectName = "休憩・私用";
 
-    private DateTime workDate = DateTime.Today;
+    private DateTime workDate = DateTime.Now;
+    private DateTime calendarMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private WorkLog? currentLog;
     private List<WorkLogEntry> entries = new();
+    private readonly Dictionary<DateTime, WorkLogDateSummary> calendarSummaryMap = new();
     private SyncTask.Data.RedmineSettings redmineSettings = new();
     private List<RedmineProject> redmineProjects = new();
     private readonly Dictionary<int, RedmineIssueSplitResult> projectIssueCache = new();
@@ -35,11 +37,15 @@ public partial class Home
     private WorkLogEntry? dragTargetEntry;
     private int? dragInsertIndex;
     private DotNetObjectReference<Home>? dotNetRef;
+    private bool isCalendarPopupOpen;
+    private static readonly string[] CalendarDayLabels = { "日", "月", "火", "水", "木", "金", "土" };
 
     protected override async Task OnInitializedAsync()
     {
         redmineSettings = await DailyLogService.GetOrCreateRedmineSettingsAsync();
         await LoadAsync();
+        calendarMonth = new DateTime(workDate.Year, workDate.Month, 1);
+        await LoadCalendarSummaryAsync();
         await LoadProjectsAsync();
     }
 
@@ -58,9 +64,125 @@ public partial class Home
     {
         if (DateTime.TryParse(args?.Value?.ToString(), out var newDate))
         {
-            workDate = newDate.Date;
-            await LoadAsync();
+            await SelectWorkDateAsync(newDate.Date);
         }
+    }
+
+    private async Task SelectWorkDateAsync(DateTime selectedDate)
+    {
+        workDate = selectedDate.Date;
+
+        var selectedMonth = new DateTime(workDate.Year, workDate.Month, 1);
+        if (selectedMonth != calendarMonth)
+        {
+            calendarMonth = selectedMonth;
+        }
+
+        await LoadAsync();
+        await LoadCalendarSummaryAsync();
+    }
+
+    private async Task MoveCalendarMonthAsync(int monthOffset)
+    {
+        calendarMonth = calendarMonth.AddMonths(monthOffset);
+        await LoadCalendarSummaryAsync();
+    }
+
+    private async Task SelectCalendarDateAsync(DateTime date)
+    {
+        await SelectWorkDateAsync(date);
+        isCalendarPopupOpen = false;
+    }
+
+    private void ToggleCalendarPopup()
+    {
+        isCalendarPopupOpen = !isCalendarPopupOpen;
+    }
+
+    private void CloseCalendarPopup()
+    {
+        isCalendarPopupOpen = false;
+    }
+
+    private async Task LoadCalendarSummaryAsync()
+    {
+        var summaries = await DailyLogService.GetWorkLogDateSummariesAsync(calendarMonth);
+        calendarSummaryMap.Clear();
+
+        foreach (var summary in summaries)
+        {
+            calendarSummaryMap[summary.WorkDate.Date] = summary;
+        }
+    }
+
+    private IReadOnlyList<DateTime?> BuildCalendarCells()
+    {
+        var first = new DateTime(calendarMonth.Year, calendarMonth.Month, 1);
+        var daysInMonth = DateTime.DaysInMonth(calendarMonth.Year, calendarMonth.Month);
+        var leadingBlankDays = (int)first.DayOfWeek;
+
+        var cells = new List<DateTime?>(42);
+        for (var index = 0; index < leadingBlankDays; index++)
+        {
+            cells.Add(null);
+        }
+
+        for (var day = 1; day <= daysInMonth; day++)
+        {
+            cells.Add(new DateTime(calendarMonth.Year, calendarMonth.Month, day));
+        }
+
+        while (cells.Count % 7 != 0)
+        {
+            cells.Add(null);
+        }
+
+        return cells;
+    }
+
+    private bool HasDataOn(DateTime date)
+    {
+        return calendarSummaryMap.TryGetValue(date.Date, out var summary) && summary.HasData;
+    }
+
+    private bool IsRedmineSyncedOn(DateTime date)
+    {
+        return calendarSummaryMap.TryGetValue(date.Date, out var summary)
+            && summary.SyncStatus == RedmineSyncStatus.Completed;
+    }
+
+    private string GetCalendarDayClass(DateTime date)
+    {
+        var classes = new List<string> { "daily-calendar__day" };
+
+        if (date.Date == workDate.Date)
+        {
+            classes.Add("is-selected");
+        }
+
+        if (date.Date == DateTime.Today)
+        {
+            classes.Add("is-today");
+        }
+
+        return string.Join(" ", classes);
+    }
+
+    private string GetCalendarDayTitle(DateTime date)
+    {
+        var labels = new List<string> { date.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture) };
+
+        if (HasDataOn(date))
+        {
+            labels.Add("データあり");
+        }
+
+        if (IsRedmineSyncedOn(date))
+        {
+            labels.Add("Redmine登録完了");
+        }
+
+        return string.Join(" / ", labels);
     }
 
     private async Task LoadAsync()
@@ -89,7 +211,9 @@ public partial class Home
             RecalculateActualStartTimesFrom(Math.Max(1, removedIndex));
         }
 
+        await MarkCurrentWorkLogDirtyAsync();
         EnsureTrailingEmptyRow();
+        await LoadCalendarSummaryAsync();
     }
 
     private Task InsertGridRowAsync(WorkLogEntry entry)
@@ -247,7 +371,7 @@ public partial class Home
         try
         {
             await DailyLogService.SaveRedmineSettingsAsync(redmineSettings);
-            var drafts = BuildTimeEntryDrafts(entries);
+            var drafts = BuildTimeEntryDrafts(entries, workDate);
 
             if (drafts.Count == 0)
             {
@@ -259,10 +383,23 @@ public partial class Home
             redmineStatusMessage = result.Errors.Count == 0
                 ? $"{result.SuccessCount} 件の実工数をRedmineへ登録しました。"
                 : $"{result.SuccessCount} 件登録 / {result.Errors.Count} 件失敗: {string.Join(" | ", result.Errors)}";
+
+            var syncStatus = result.Errors.Count == 0
+                ? RedmineSyncStatus.Completed
+                : result.SuccessCount > 0
+                    ? RedmineSyncStatus.Partial
+                    : RedmineSyncStatus.Failed;
+
+            await DailyLogService.UpdateWorkLogSyncStatusAsync(currentLog.Id, syncStatus, redmineStatusMessage);
+            currentLog.RedmineSyncStatus = syncStatus;
+            await LoadCalendarSummaryAsync();
         }
         catch (Exception ex)
         {
             redmineStatusMessage = $"実工数登録に失敗しました: {ex.Message}";
+            await DailyLogService.UpdateWorkLogSyncStatusAsync(currentLog.Id, RedmineSyncStatus.Failed, redmineStatusMessage);
+            currentLog.RedmineSyncStatus = RedmineSyncStatus.Failed;
+            await LoadCalendarSummaryAsync();
         }
         finally
         {
@@ -852,13 +989,33 @@ public partial class Home
                 entries.Remove(entry);
             }
 
+            await MarkCurrentWorkLogDirtyAsync();
             EnsureTrailingEmptyRow();
+            await LoadCalendarSummaryAsync();
             return;
         }
 
         entry.WorkLogId = currentLog.Id;
         await DailyLogService.SaveEntryAsync(entry);
+        await MarkCurrentWorkLogDirtyAsync();
         EnsureTrailingEmptyRow();
+        await LoadCalendarSummaryAsync();
+    }
+
+    private async Task MarkCurrentWorkLogDirtyAsync()
+    {
+        if (currentLog is null)
+        {
+            return;
+        }
+
+        if (currentLog.RedmineSyncStatus == RedmineSyncStatus.None)
+        {
+            return;
+        }
+
+        currentLog.RedmineSyncStatus = RedmineSyncStatus.None;
+        await DailyLogService.UpdateWorkLogSyncStatusAsync(currentLog.Id, RedmineSyncStatus.None, string.Empty);
     }
 
     private static void RecalculateGridEntry(WorkLogEntry entry)
@@ -1016,7 +1173,7 @@ public partial class Home
         return time == TimeSpan.Zero ? "-" : time.ToString("hh\\:mm", CultureInfo.InvariantCulture);
     }
 
-    private static List<RedmineTimeEntryDraft> BuildTimeEntryDrafts(IEnumerable<WorkLogEntry> sourceEntries)
+    private static List<RedmineTimeEntryDraft> BuildTimeEntryDrafts(IEnumerable<WorkLogEntry> sourceEntries, DateTime workDate)
     {
         var grouped = sourceEntries
             .Where(entry => entry.ActualHours > 0 && !IsBreakEntry(entry))
@@ -1042,6 +1199,9 @@ public partial class Home
     private static string BuildTimeEntryComment(string project, string story, string task)
     {
         var commentParts = new List<string> { "SyncTask登録" };
+
+        var dateFormatted = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        commentParts.Add($"登録日時:{dateFormatted}");
 
         if (!string.IsNullOrWhiteSpace(project))
         {

@@ -1,0 +1,98 @@
+.attendance-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.attendance-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.attendance-month-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.attendance-month-picker input[type="month"] {
+  height: 2rem;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.82);
+  padding: 0 0.5rem;
+}
+
+.attendance-sheet {
+  max-width: 880px;
+}
+
+.attendance-sheet__table-wrap {
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.attendance-table {
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.attendance-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15); /* 白の透過度を下げる */
+  padding: 0.8rem 0.5rem; /* 出勤簿なので少しゆったりさせる */
+  backdrop-filter: blur(4px); /* セル自体にもわずかなボカシを入れると質感が上がる */
+}
+
+.attendance-table th,
+.attendance-table td {
+  text-align: center;
+}
+
+.attendance-table th:nth-child(1),
+.attendance-table td:nth-child(1) {
+  width: 90px;
+}
+
+.attendance-table th:nth-child(2),
+.attendance-table td:nth-child(2) {
+  width: 70px;
+}
+
+.attendance-table th:nth-child(3),
+.attendance-table td:nth-child(3) {
+  width: 72px;
+}
+
+.attendance-day--saturday td:nth-child(1),
+.attendance-day--saturday td:nth-child(2) {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.attendance-day--holiday td:nth-child(1),
+.attendance-day--holiday td:nth-child(2) {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.attendance-sheet__summary {
+  margin-top: 0.8rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .attendance-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .attendance-sheet {
+    max-width: 100%;
+  }
+}

@@ -5,6 +5,7 @@ namespace SyncTask.Services;
 
 public class DailyLogService
 {
+    private const string BreakProjectName = "休憩・私用";
     private SQLiteAsyncConnection? _database;
 
     private sealed class TableInfoRow
@@ -35,6 +36,7 @@ public class DailyLogService
         await _database.CreateTableAsync<WorkLog>();
         await _database.CreateTableAsync<WorkLogEntry>();
         await _database.CreateTableAsync<RedmineSettings>();
+        await EnsureWorkLogSchemaAsync(_database);
         await EnsureWorkLogEntrySchemaAsync(_database);
 
         return _database;
@@ -91,6 +93,27 @@ public class DailyLogService
         }
     }
 
+    private static async Task EnsureWorkLogSchemaAsync(SQLiteAsyncConnection database)
+    {
+        var tableInfo = await database.QueryAsync<TableInfoRow>("PRAGMA table_info('WorkLog')");
+        var columnNames = tableInfo.Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (!columnNames.Contains("RedmineSyncStatus"))
+        {
+            await database.ExecuteAsync("ALTER TABLE WorkLog ADD COLUMN RedmineSyncStatus INTEGER NOT NULL DEFAULT 0");
+        }
+
+        if (!columnNames.Contains("RedmineSyncedAt"))
+        {
+            await database.ExecuteAsync("ALTER TABLE WorkLog ADD COLUMN RedmineSyncedAt DATETIME NULL");
+        }
+
+        if (!columnNames.Contains("RedmineSyncMessage"))
+        {
+            await database.ExecuteAsync("ALTER TABLE WorkLog ADD COLUMN RedmineSyncMessage TEXT NULL");
+        }
+    }
+
     public async Task<WorkLog> GetOrCreateDailyLogAsync(DateTime workDate)
     {
         var database = await GetDatabaseAsync();
@@ -126,12 +149,128 @@ public class DailyLogService
         }
     }
 
+    public async Task<List<WorkLogDateSummary>> GetWorkLogDateSummariesAsync(DateTime month)
+    {
+        var database = await GetDatabaseAsync();
+        var firstDate = new DateTime(month.Year, month.Month, 1);
+        var endDate = firstDate.AddMonths(1);
+
+        var logs = await database.Table<WorkLog>()
+            .Where(log => log.WorkDate >= firstDate && log.WorkDate < endDate)
+            .ToListAsync();
+
+        if (logs.Count == 0)
+        {
+            return new List<WorkLogDateSummary>();
+        }
+
+        var logIds = logs.Select(log => log.Id).ToHashSet();
+        var entries = (await database.Table<WorkLogEntry>().ToListAsync())
+            .Where(entry => logIds.Contains(entry.WorkLogId))
+            .ToList();
+
+        var entryCountByLogId = entries
+            .GroupBy(entry => entry.WorkLogId)
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        return logs
+            .Select(log => new WorkLogDateSummary(
+                log.WorkDate.Date,
+                entryCountByLogId.TryGetValue(log.Id, out var count) && count > 0,
+                log.RedmineSyncStatus))
+            .OrderBy(summary => summary.WorkDate)
+            .ToList();
+    }
+
     public async Task<List<WorkLogEntry>> GetEntriesAsync(int workLogId)
     {
         var database = await GetDatabaseAsync();
         return await database.Table<WorkLogEntry>()
             .Where(entry => entry.WorkLogId == workLogId)
             .ToListAsync();
+    }
+
+    public async Task<AttendanceMonthlyReport> GetAttendanceMonthlyReportAsync(DateTime month)
+    {
+        var database = await GetDatabaseAsync();
+        var targetMonth = new DateTime(month.Year, month.Month, 1);
+        var periodStartDate = targetMonth.AddMonths(-1).AddDays(20);
+        var periodEndDate = targetMonth.AddDays(19);
+        var endDateExclusive = periodEndDate.AddDays(1);
+
+        var logs = await database.Table<WorkLog>()
+            .Where(log => log.WorkDate >= periodStartDate && log.WorkDate < endDateExclusive)
+            .ToListAsync();
+
+        var entriesByDate = new Dictionary<DateTime, List<WorkLogEntry>>();
+
+        if (logs.Count > 0)
+        {
+            var logIds = logs.Select(log => log.Id).ToHashSet();
+            var entries = (await database.Table<WorkLogEntry>().ToListAsync())
+                .Where(entry => logIds.Contains(entry.WorkLogId))
+                .ToList();
+
+            var workDateByLogId = logs.ToDictionary(log => log.Id, log => log.WorkDate.Date);
+
+            foreach (var entry in entries)
+            {
+                if (!workDateByLogId.TryGetValue(entry.WorkLogId, out var date))
+                {
+                    continue;
+                }
+
+                if (!entriesByDate.TryGetValue(date, out var list))
+                {
+                    list = new List<WorkLogEntry>();
+                    entriesByDate[date] = list;
+                }
+
+                list.Add(entry);
+            }
+        }
+
+        var days = new List<AttendanceDaySummary>();
+        var cursor = periodStartDate;
+
+        while (cursor < endDateExclusive)
+        {
+            entriesByDate.TryGetValue(cursor.Date, out var dayEntries);
+            dayEntries ??= new List<WorkLogEntry>();
+
+            var hasAttendance = dayEntries.Count > 0;
+
+            var startCandidates = dayEntries
+                .Where(entry => entry.ActualStartTime > TimeSpan.Zero)
+                .Select(entry => entry.ActualStartTime)
+                .ToList();
+
+            var endCandidates = dayEntries
+                .Where(entry => entry.ActualEndTime > TimeSpan.Zero)
+                .Select(entry => entry.ActualEndTime)
+                .ToList();
+
+            TimeSpan? startTime = startCandidates.Count > 0 ? startCandidates.Min() : null;
+            TimeSpan? endTime = endCandidates.Count > 0 ? endCandidates.Max() : null;
+
+            var workingHours = dayEntries
+                .Where(entry => !string.Equals(entry.Project, BreakProjectName, StringComparison.Ordinal))
+                .Sum(entry => entry.ActualHours);
+
+            days.Add(new AttendanceDaySummary(
+                cursor.Date,
+                hasAttendance,
+                startTime,
+                endTime,
+                workingHours));
+
+            cursor = cursor.AddDays(1);
+        }
+
+        var workingDays = days.Count(day => day.WorkingHours > 0);
+        var totalWorkingHours = days.Sum(day => day.WorkingHours);
+
+        return new AttendanceMonthlyReport(targetMonth, periodStartDate, periodEndDate, days, workingDays, totalWorkingHours);
     }
 
     public async Task SaveEntryAsync(WorkLogEntry entry)
@@ -177,5 +316,20 @@ public class DailyLogService
         var database = await GetDatabaseAsync();
         settings.Id = 1;
         await database.InsertOrReplaceAsync(settings);
+    }
+
+    public async Task UpdateWorkLogSyncStatusAsync(int workLogId, RedmineSyncStatus status, string? message = null)
+    {
+        var database = await GetDatabaseAsync();
+        var workLog = await database.FindAsync<WorkLog>(workLogId);
+        if (workLog is null)
+        {
+            return;
+        }
+
+        workLog.RedmineSyncStatus = status;
+        workLog.RedmineSyncedAt = status == RedmineSyncStatus.None ? null : DateTime.Now;
+        workLog.RedmineSyncMessage = message ?? string.Empty;
+        await database.UpdateAsync(workLog);
     }
 }

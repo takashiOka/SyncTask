@@ -29,6 +29,12 @@
 					<span class="app-sidebar__text">デイリー管理</span>
 				</span>
 			</NavLink>
+			<NavLink href="/attendance" ActiveClass="active" class="app-sidebar__link" title="出勤簿" aria-label="出勤簿ページへ移動" @onclick="OnNavigateAsync">
+				<span class="app-sidebar__link-row">
+					<span class="app-sidebar__icon" aria-hidden="true"><i class="bi bi-calendar-week"></i></span>
+					<span class="app-sidebar__text">出勤簿</span>
+				</span>
+			</NavLink>
 			<NavLink href="/redmine-settings" ActiveClass="active" class="app-sidebar__link" title="Redmine設定" aria-label="Redmine設定ページへ移動" @onclick="OnNavigateAsync">
 				<span class="app-sidebar__link-row">
 					<span class="app-sidebar__icon" aria-hidden="true"><i class="bi bi-sliders"></i></span>
@@ -174,6 +180,7 @@
 		return path switch
 		{
 			"" => "デイリー管理",
+			"attendance" => "出勤簿",
 			"redmine-settings" => "Redmine設定",
 			_ => "ページ"
 		};

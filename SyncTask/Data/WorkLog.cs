@@ -11,6 +11,12 @@ public class WorkLog
     [Indexed]
     public DateTime WorkDate { get; set; }
 
+    public RedmineSyncStatus RedmineSyncStatus { get; set; } = RedmineSyncStatus.None;
+
+    public DateTime? RedmineSyncedAt { get; set; }
+
+    public string RedmineSyncMessage { get; set; } = string.Empty;
+
     public string? StartTime { get; set; }
 
     public string? EndTime { get; set; }

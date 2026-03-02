@@ -1,0 +1,55 @@
+@page "/attendance"
+
+<div class="attendance-page daily-page">
+    <section class="daily-page__hero glass-card attendance-hero">
+        <div>
+            <h1>出勤簿</h1>
+            <p class="daily-page__subtitle">月次の出勤・退勤と労働時間を一覧で確認</p>
+        </div>
+        <div class="attendance-month-picker">
+            <button class="btn btn--ghost" @onclick="() => MoveMonthAsync(-1)">前月</button>
+            <input type="month" value="@TargetMonthInput" @onchange="OnMonthChangedAsync" />
+            <button class="btn btn--ghost" @onclick="() => MoveMonthAsync(1)">次月</button>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="daily-status glass-card">@statusMessage</div>
+    }
+
+    <section class="daily-card glass-card attendance-sheet">
+        <div class="attendance-sheet__table-wrap">
+            <table class="daily-log__table attendance-table">
+                <thead>
+                    <tr>
+                        <th>日付</th>
+                        <th>曜日</th>
+                        <th>出勤</th>
+                        <th>出勤時刻</th>
+                        <th>退勤時刻</th>
+                        <th>勤務時間合計</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var day in report.Days)
+                    {
+                        <tr class="@GetDayRowClass(day.Date)">
+                            <td>@day.Date.ToString("MM/dd")</td>
+                            <td>@GetWeekdayLabel(day.Date)</td>
+                            <td>@(day.HasAttendance ? "◯" : string.Empty)</td>
+                            <td>@FormatTime(day.StartTime)</td>
+                            <td>@FormatTime(day.EndTime)</td>
+                            <td>@FormatHours(day.WorkingHours)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="attendance-sheet__summary">
+            <span class="daily-badge">実労働日数 @report.WorkingDays 日</span>
+            <span class="daily-badge">総労働時間 @FormatHours(report.TotalWorkingHours) h</span>
+        </div>
+    </section>
+</div>

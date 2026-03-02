@@ -19,6 +19,7 @@ namespace SyncTask
             builder.Services.AddSingleton<DailyLogService>();
             builder.Services.AddSingleton<HttpClient>();
             builder.Services.AddSingleton<RedmineService>();
+            builder.Services.AddSingleton<IHolidayService, JapaneseHolidayService>();
 
 #if DEBUG
     		builder.Services.AddBlazorWebViewDeveloperTools();

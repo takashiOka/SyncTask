@@ -8,7 +8,58 @@
             <p class="daily-page__subtitle">勤務報告の作成と Redmine 実工数登録を一画面で管理</p>
         </div>
         <div class="daily-page__badges">
-            <span class="daily-badge">対象日 @workDate.ToString("yyyy/MM/dd")</span>
+            <button type="button" class="daily-badge daily-badge--clickable" @onclick="ToggleCalendarPopup" aria-expanded="@isCalendarPopupOpen">
+                対象日 @workDate.ToString("yyyy/MM/dd")
+            </button>
+
+            <div class="daily-calendar-mini">
+                @if (isCalendarPopupOpen)
+                {
+                    <div class="daily-calendar-mini__backdrop" @onclick="CloseCalendarPopup"></div>
+                    <div class="daily-calendar-mini__popup" @onclick:stopPropagation="true">
+                        <div class="daily-calendar-mini__header">
+                            <button class="btn btn--ghost daily-calendar-mini__nav" @onclick="() => MoveCalendarMonthAsync(-1)" aria-label="前月">‹</button>
+                            <span class="daily-calendar-mini__month">@calendarMonth.ToString("yyyy年M月")</span>
+                            <button class="btn btn--ghost daily-calendar-mini__nav" @onclick="() => MoveCalendarMonthAsync(1)" aria-label="翌月">›</button>
+                        </div>
+                        <div class="daily-calendar-mini__weekdays">
+                            @foreach (var dayLabel in CalendarDayLabels)
+                            {
+                                <span>@dayLabel</span>
+                            }
+                        </div>
+                        <div class="daily-calendar-mini__grid">
+                            @foreach (var dateCell in BuildCalendarCells())
+                            {
+                                if (dateCell is null)
+                                {
+                                    <span class="daily-calendar__blank"></span>
+                                    continue;
+                                }
+
+                                var date = dateCell.Value;
+
+                                <button class="@GetCalendarDayClass(date)"
+                                        title="@GetCalendarDayTitle(date)"
+                                        @onclick="() => SelectCalendarDateAsync(date)">
+                                    <span class="daily-calendar__day-number">@date.Day</span>
+                                    <span class="daily-calendar__marks">
+                                        @if (HasDataOn(date))
+                                        {
+                                            <span class="daily-calendar__mark daily-calendar__mark--data" title="データあり"></span>
+                                        }
+                                        @if (IsRedmineSyncedOn(date))
+                                        {
+                                            <span class="daily-calendar__mark daily-calendar__mark--synced" title="Redmine登録完了"></span>
+                                        }
+                                    </span>
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
             <span class="daily-badge">タスク @entries.Count(x => !IsEntryEmpty(x)) 件</span>
             <span class="daily-badge">作業時間 @FormatHours(entries.Where(x => !IsBreakEntry(x)).Sum(x => x.ActualHours)) h</span>
             <span class="daily-badge">休憩時間 @FormatHours(entries.Where(x => IsBreakEntry(x)).Sum(x => x.ActualHours)) h</span>
