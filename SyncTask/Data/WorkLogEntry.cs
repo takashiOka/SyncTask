@@ -31,6 +31,8 @@ public class WorkLogEntry
 
     public TimeSpan PlannedEndTime { get; set; }
 
+    public TimeSpan ActualStartTime { get; set; }
+
     public TimeSpan ActualEndTime { get; set; }
 
     public decimal PlannedHours { get; set; }

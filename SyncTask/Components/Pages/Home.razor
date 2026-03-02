@@ -30,11 +30,12 @@
                             <th>プロジェクト</th>
                             <th>ストーリー</th>
                             <th>タスク</th>
-                            <th>開始</th>
-                            <th>工数(予)</th>
-                            <th>終了(予)</th>
-                            <th>終了(実)</th>
-                            <th>工数(実)</th>
+                            <th class="daily-grid-head--plan">工数(予)</th>
+                            <th class="daily-grid-head--plan">開始(予)</th>
+                            <th class="daily-grid-head--plan">終了(予)</th>
+                            <th class="daily-grid-head--actual">開始(実)</th>
+                            <th class="daily-grid-head--actual">終了(実)</th>
+                            <th class="daily-grid-head--actual">工数(実)</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -91,15 +92,7 @@
                                         }
                                     </select>
                                 </td>
-                                <td>
-                                    <input type="time"
-                                           step="900"
-                                           value="@ToInputTime(entry.StartTime)"
-                                           @oninput="args => OnGridStartTimeChanged(entry, args)"
-                                           @onblur="async _ => await SaveGridRowAsync(entry)"
-                                           disabled="@(index > 0)" />
-                                </td>
-                                <td>
+                                <td class="daily-grid-cell--plan">
                                     <input type="number"
                                            min="0"
                                            step="0.25"
@@ -107,18 +100,33 @@
                                            @oninput="args => OnGridPlannedHoursChanged(entry, args)"
                                            @onblur="async _ => await SaveGridRowAsync(entry)" />
                                 </td>
-                                <td class="daily-grid-cell--readonly">
+                                <td class="daily-grid-cell--plan">
+                                    <input type="time"
+                                           step="900"
+                                           value="@ToInputTime(entry.StartTime)"
+                                           @oninput="args => OnGridStartTimeChanged(entry, args)"
+                                           @onblur="async _ => await SaveGridRowAsync(entry)"
+                                           disabled="@(index > 0)" />
+                                </td>
+                                <td class="daily-grid-cell--readonly daily-grid-cell--plan">
                                     <input type="text"
                                            value="@FormatTime(entry.PlannedEndTime)"
                                            disabled />
                                 </td>
-                                <td>
+                                <td class="daily-grid-cell--actual">
+                                    <input type="time"
+                                           value="@ToInputTime(entry.ActualStartTime)"
+                                           @oninput="args => OnGridActualStartTimeChanged(entry, args)"
+                                           @onblur="async _ => await SaveGridRowAsync(entry)"
+                                           disabled="@(index > 0)" />
+                                </td>
+                                <td class="daily-grid-cell--actual">
                                     <input type="time"
                                            value="@ToInputTime(entry.ActualEndTime)"
                                            @oninput="args => OnGridActualEndTimeChanged(entry, args)"
                                            @onblur="async _ => await SaveGridRowAsync(entry)" />
                                 </td>
-                                <td class="daily-grid-cell--readonly">
+                                <td class="daily-grid-cell--readonly daily-grid-cell--actual">
                                     <input type="text"
                                            value="@FormatHours(entry.ActualHours)"
                                            disabled />

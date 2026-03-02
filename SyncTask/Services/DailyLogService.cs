@@ -80,6 +80,11 @@ public class DailyLogService
             await database.ExecuteAsync("ALTER TABLE WorkLogEntry ADD COLUMN PlannedEndTime BIGINT NOT NULL DEFAULT 0");
         }
 
+        if (!columnNames.Contains("ActualStartTime"))
+        {
+            await database.ExecuteAsync("ALTER TABLE WorkLogEntry ADD COLUMN ActualStartTime BIGINT NOT NULL DEFAULT 0");
+        }
+
         if (!columnNames.Contains("ActualEndTime"))
         {
             await database.ExecuteAsync("ALTER TABLE WorkLogEntry ADD COLUMN ActualEndTime BIGINT NOT NULL DEFAULT 0");

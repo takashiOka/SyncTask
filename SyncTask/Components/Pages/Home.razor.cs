@@ -66,7 +66,8 @@ public partial class Home
     {
         currentLog = await DailyLogService.GetOrCreateDailyLogAsync(workDate);
         entries = await DailyLogService.GetEntriesAsync(currentLog.Id);
-        RecalculateStartTimesFrom(1);
+        RecalculatePlannedStartTimesFrom(1);
+        RecalculateActualStartTimesFrom(1);
         EnsureTrailingEmptyRow();
         await PreloadProjectIssuesAsync(entries);
     }
@@ -83,7 +84,8 @@ public partial class Home
 
         if (removedIndex >= 0)
         {
-            RecalculateStartTimesFrom(Math.Max(1, removedIndex));
+            RecalculatePlannedStartTimesFrom(Math.Max(1, removedIndex));
+            RecalculateActualStartTimesFrom(Math.Max(1, removedIndex));
         }
 
         EnsureTrailingEmptyRow();
@@ -97,17 +99,21 @@ public partial class Home
             return Task.CompletedTask;
         }
 
-        var inheritedStart = entry.ActualEndTime;
+        var inheritedPlannedStart = entry.PlannedEndTime;
+        var inheritedActualStart = ResolveNextActualStartTime(entry);
         var inserted = new WorkLogEntry
         {
-            StartTime = inheritedStart,
-            ActualEndTime = inheritedStart
+            PlannedHours = 0,
+            StartTime = inheritedPlannedStart,
+            ActualStartTime = inheritedActualStart,
+            ActualEndTime = TimeSpan.Zero
         };
 
         var insertIndex = insertAfterIndex + 1;
         entries.Insert(insertIndex, inserted);
         RecalculateGridEntry(inserted);
-        RecalculateStartTimesFrom(insertIndex + 1);
+        RecalculatePlannedStartTimesFrom(insertIndex + 1);
+        RecalculateActualStartTimesFrom(insertIndex + 1);
         EnsureTrailingEmptyRow();
 
         return Task.CompletedTask;
@@ -536,7 +542,8 @@ public partial class Home
         entries.RemoveAt(draggedIndex);
 
         entries.Insert(insertIndex, draggedEntry);
-        RecalculateStartTimesFrom(0);
+        RecalculatePlannedStartTimesFrom(0);
+        RecalculateActualStartTimesFrom(0);
 
         if (currentLog is not null)
         {
@@ -726,29 +733,50 @@ public partial class Home
 
         entry.StartTime = ParseTimeSpan(args?.Value?.ToString());
         RecalculateGridEntry(entry);
+        RecalculatePlannedStartTimesFrom(1);
+        RecalculateActualStartTimesFrom(0);
     }
 
     private void OnGridPlannedHoursChanged(WorkLogEntry entry, ChangeEventArgs args)
     {
         entry.PlannedHours = ParseDecimal(args?.Value?.ToString());
         RecalculateGridEntry(entry);
+
+        var currentIndex = entries.IndexOf(entry);
+        if (currentIndex >= 0)
+        {
+            RecalculatePlannedStartTimesFrom(currentIndex + 1);
+            RecalculateActualStartTimesFrom(currentIndex + 1);
+        }
+    }
+
+    private void OnGridActualStartTimeChanged(WorkLogEntry entry, ChangeEventArgs args)
+    {
+        if (entries.IndexOf(entry) > 0)
+        {
+            return;
+        }
+
+        entry.ActualStartTime = ParseTimeSpan(args?.Value?.ToString());
+        RecalculateGridEntry(entry);
+        RecalculateActualStartTimesFrom(1);
     }
 
     private void OnGridActualEndTimeChanged(WorkLogEntry entry, ChangeEventArgs args)
     {
         entry.ActualEndTime = ParseTimeSpan(args?.Value?.ToString());
-        RecalculateGridEntry(entry);
 
-        if (entry.StartTime != TimeSpan.Zero && entry.ActualEndTime != TimeSpan.Zero)
+        if (entry.ActualStartTime == TimeSpan.Zero && entry.StartTime != TimeSpan.Zero)
         {
-            entry.PlannedHours = entry.ActualHours;
-            RecalculateGridEntry(entry);
+            entry.ActualStartTime = entry.StartTime;
         }
+
+        RecalculateGridEntry(entry);
 
         var currentIndex = entries.IndexOf(entry);
         if (currentIndex >= 0)
         {
-            RecalculateStartTimesFrom(currentIndex + 1);
+            RecalculateActualStartTimesFrom(currentIndex + 1);
         }
     }
 
@@ -789,13 +817,13 @@ public partial class Home
             entry.PlannedEndTime = TimeSpan.Zero;
         }
 
-        if (entry.StartTime == TimeSpan.Zero || entry.ActualEndTime == TimeSpan.Zero)
+        if (entry.ActualStartTime == TimeSpan.Zero || entry.ActualEndTime == TimeSpan.Zero)
         {
             entry.ActualHours = 0;
             return;
         }
 
-        var diff = entry.ActualEndTime - entry.StartTime;
+        var diff = entry.ActualEndTime - entry.ActualStartTime;
         if (diff < TimeSpan.Zero)
         {
             diff = diff.Add(TimeSpan.FromDays(1));
@@ -805,7 +833,40 @@ public partial class Home
         entry.ActualHours = (decimal)Math.Max(0, roundedHours);
     }
 
-    private void RecalculateStartTimesFrom(int startRowIndex)
+    private void RecalculatePlannedStartTimesFrom(int startRowIndex)
+    {
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        if (startRowIndex < 0)
+        {
+            startRowIndex = 0;
+        }
+
+        if (startRowIndex == 0)
+        {
+            if (entries[0].ActualStartTime == TimeSpan.Zero && entries[0].StartTime != TimeSpan.Zero)
+            {
+                entries[0].ActualStartTime = entries[0].StartTime;
+            }
+
+            RecalculateGridEntry(entries[0]);
+            startRowIndex = 1;
+        }
+
+        for (var rowIndex = startRowIndex; rowIndex < entries.Count; rowIndex++)
+        {
+            var previousRow = entries[rowIndex - 1];
+            var currentRow = entries[rowIndex];
+
+            currentRow.StartTime = previousRow.PlannedEndTime;
+            RecalculateGridEntry(currentRow);
+        }
+    }
+
+    private void RecalculateActualStartTimesFrom(int startRowIndex)
     {
         if (entries.Count == 0)
         {
@@ -828,9 +889,19 @@ public partial class Home
             var previousRow = entries[rowIndex - 1];
             var currentRow = entries[rowIndex];
 
-            currentRow.StartTime = previousRow.ActualEndTime;
+            currentRow.ActualStartTime = ResolveNextActualStartTime(previousRow);
             RecalculateGridEntry(currentRow);
         }
+    }
+
+    private static TimeSpan ResolveNextActualStartTime(WorkLogEntry previousEntry)
+    {
+        if (previousEntry.ActualEndTime != TimeSpan.Zero)
+        {
+            return previousEntry.ActualEndTime;
+        }
+
+        return previousEntry.PlannedEndTime;
     }
 
     private void EnsureTrailingEmptyRow()
@@ -991,11 +1062,12 @@ public partial class Home
 
         var firstEntry = targetEntries[0];
         var lastEntry = targetEntries[^1];
+        var actualStart = firstEntry.ActualStartTime == TimeSpan.Zero ? firstEntry.StartTime : firstEntry.ActualStartTime;
         var hasBreakEntry = targetEntries.Any(IsBreakEntry);
         var breakHours = targetEntries.Where(IsBreakEntry).Sum(entry => entry.ActualHours);
         var activeHoursFromRows = targetEntries.Where(entry => !IsBreakEntry(entry)).Sum(entry => entry.ActualHours);
 
-        if (firstEntry.StartTime == TimeSpan.Zero || lastEntry.ActualEndTime == TimeSpan.Zero)
+        if (actualStart == TimeSpan.Zero || lastEntry.ActualEndTime == TimeSpan.Zero)
         {
             if (activeHoursFromRows <= 0 && !hasBreakEntry)
             {
@@ -1015,7 +1087,7 @@ public partial class Home
             return string.Join(Environment.NewLine, fallbackLines);
         }
 
-        var elapsed = lastEntry.ActualEndTime - firstEntry.StartTime;
+        var elapsed = lastEntry.ActualEndTime - actualStart;
         if (elapsed < TimeSpan.Zero)
         {
             elapsed = elapsed.Add(TimeSpan.FromDays(1));
@@ -1026,7 +1098,7 @@ public partial class Home
 
         var lines = new List<string>
         {
-            $"{firstEntry.StartTime:hh\\:mm}～{lastEntry.ActualEndTime:hh\\:mm}",
+            $"{actualStart:hh\\:mm}～{lastEntry.ActualEndTime:hh\\:mm}",
             $"稼働合計：{FormatHoursFixed(activeHours)}h"
         };
 
