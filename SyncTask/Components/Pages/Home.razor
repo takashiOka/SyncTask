@@ -38,7 +38,7 @@
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="daily-log-tbody">
                         @for (var index = 0; index < entries.Count; index++)
                         {
                             var entry = entries[index];
@@ -46,16 +46,11 @@
                             var tasks = GetTaskOptions(entry);
 
                             <tr @key="entry"
-                                class="@GetRowClass(entry)"
-                                draggable="true"
-                                @ondragstart="@(() => HandleDragStart(entry))"
-                                @ondragenter="@(() => HandleDragEnter(entry))"
-                                @ondragover="@((Microsoft.AspNetCore.Components.Web.DragEventArgs _) => { })"
-                                @ondragover:preventDefault="true"
-                                @ondragend="HandleDragEnd"
-                                @ondrop="HandleDrop">
+                                data-row-index="@index"
+                                class="@GetRowClass(entry)">
                                 <td>
-                                    <i class="bi bi-grip-vertical drag-handle"></i>
+                                    <i class="bi bi-grip-vertical drag-handle"
+                                        onpointerdown="window.syncTaskDnd && window.syncTaskDnd.startPointerDrag(event)"></i>
                                 </td>
                                 <td>
                                     <select value="@GetProjectSelectValue(entry)"

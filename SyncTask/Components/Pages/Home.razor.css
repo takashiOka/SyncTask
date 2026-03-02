@@ -129,19 +129,25 @@
   /* appearance: none; ブラウザ標準の矢印を消して制御しやすくする場合 */
 }
 
-.daily-log__table tbody tr:nth-child(even) {
+.daily-log__table tbody tr:nth-child(even) td {
   background: rgba(248, 250, 252, 0.6);
 }
 
-.daily-log__table tbody tr:hover {
+.daily-log__table tbody tr:hover td {
   background: rgba(219, 234, 254, 0.28);
 }
 
 .drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.1rem;
   color: rgba(148, 163, 184, 0.9);
   cursor: grab;
   font-size: 0.9rem;
   line-height: 1;
+  user-select: none;
 }
 
 .drag-handle:hover {
@@ -152,12 +158,12 @@ tr:active .drag-handle {
   cursor: grabbing;
 }
 
-.daily-log__table tbody tr.dragging {
+.daily-log__table tbody tr.dragging td {
   opacity: 0.5;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
 }
 
-.daily-log__table tbody tr.drag-over {
+.daily-log__table tbody tr.drag-over td {
   border-top: 2px solid rgba(37, 99, 235, 0.9);
 }
 

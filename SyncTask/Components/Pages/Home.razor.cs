@@ -1,9 +1,11 @@
 using System.Globalization;
 using System.Text;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using SyncTask.Data;
 using SyncTask.Services;
+using WebDragEventArgs = Microsoft.AspNetCore.Components.Web.DragEventArgs;
 
 namespace SyncTask.Components.Pages;
 
@@ -12,6 +14,7 @@ public partial class Home
     [Inject] private DailyLogService DailyLogService { get; set; } = default!;
     [Inject] private RedmineService RedmineService { get; set; } = default!;
     [Inject] private IJSRuntime JS { get; set; } = default!;
+    [Inject] private ILogger<Home> Logger { get; set; } = default!;
 
     private const string MailBodyTemplateAssetPath = "report_template.txt";
     private const string DefaultMailBodyTemplate = "寺田様：\n\nお疲れ様です。岡です。\n\n${date}の作業報告をお送りいたします。\n\n■作業時間\n\n${worktime_section}\n\n■作業内容\n${content_section}\n\n■作業予定(${next_date})\n ●\n  ・";
@@ -29,12 +32,25 @@ public partial class Home
     private string generatedMailBody = string.Empty;
     private WorkLogEntry? draggedEntry;
     private WorkLogEntry? dragTargetEntry;
+    private DotNetObjectReference<Home>? dotNetRef;
+    private bool isDragging;
 
     protected override async Task OnInitializedAsync()
     {
         redmineSettings = await DailyLogService.GetOrCreateRedmineSettingsAsync();
         await LoadAsync();
         await LoadProjectsAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        dotNetRef ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("syncTaskDnd.attachTableDropZone", "daily-log-tbody", dotNetRef);
+
+        if (firstRender)
+        {
+            Logger.LogInformation("[DND:init] JS drop-zone attached");
+        }
     }
 
     private async Task OnWorkDateChanged(ChangeEventArgs args)
@@ -354,44 +370,98 @@ public partial class Home
         }
     }
 
-    private void HandleDragStart(WorkLogEntry entry)
+    [JSInvokable]
+    public Task NotifyPointerDragStart(int sourceIndex)
     {
-        Console.WriteLine($"Drag started: EntryId={entry.Id}, Project={entry.Project}, Story={entry.Story}, Task={entry.Task}");
-        if (IsEntryEmpty(entry))
+        if (sourceIndex < 0 || sourceIndex >= entries.Count)
         {
-            draggedEntry = null;
-            dragTargetEntry = null;
-            return;
+            LogDragState($"pointer-start-ignore-out-of-range index={sourceIndex}");
+            return Task.CompletedTask;
         }
 
-        draggedEntry = entry;
-        dragTargetEntry = entry;
-    }
-
-    private void HandleDragEnter(WorkLogEntry entry)
-    {
-        Console.WriteLine($"Drag entered: EntryId={entry.Id}, Project={entry.Project}, Story={entry.Story}, Task={entry.Task}");
-        if (draggedEntry is null || IsEntryEmpty(entry))
+        var sourceEntry = entries[sourceIndex];
+        if (IsEntryEmpty(sourceEntry))
         {
-            return;
+            LogDragState($"pointer-start-ignore-empty index={sourceIndex}");
+            return Task.CompletedTask;
         }
 
-        dragTargetEntry = entry;
+        isDragging = true;
+        draggedEntry = sourceEntry;
+        dragTargetEntry = sourceEntry;
+        LogDragState($"pointer-start index={sourceIndex}");
+        return Task.CompletedTask;
     }
 
-    private void HandleDragEnd()
+    [JSInvokable]
+    public async Task NotifyPointerDragCancel()
     {
-        Console.WriteLine($"Drag ended: EntryId={draggedEntry?.Id}, Project={draggedEntry?.Project}, Story={draggedEntry?.Story}, Task={draggedEntry?.Task}");
+        LogDragState("pointer-cancel");
+        isDragging = false;
         draggedEntry = null;
         dragTargetEntry = null;
+        await InvokeAsync(StateHasChanged);
     }
 
-    private async Task HandleDrop()
+    [JSInvokable]
+    public Task NotifyDragOverIndex(int targetIndex)
     {
-        Console.WriteLine($"Handling drop: DraggedEntryId={draggedEntry?.Id}, DragTargetEntryId={dragTargetEntry?.Id}");
+        if (draggedEntry is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (targetIndex < 0 || targetIndex >= entries.Count)
+        {
+            LogDragState($"dragover-ignore-out-of-range index={targetIndex}");
+            return Task.CompletedTask;
+        }
+
+        var targetEntry = entries[targetIndex];
+        if (IsEntryEmpty(targetEntry))
+        {
+            return Task.CompletedTask;
+        }
+
+        if (!ReferenceEquals(dragTargetEntry, targetEntry))
+        {
+            dragTargetEntry = targetEntry;
+            LogDragState($"dragover-target-set index={targetIndex}");
+            _ = InvokeAsync(StateHasChanged);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public async Task NotifyDropIndex(int targetIndex)
+    {
+        LogDragState($"drop-notify index={targetIndex}");
+
+        if (targetIndex < 0 || targetIndex >= entries.Count)
+        {
+            LogDragState($"drop-ignore-out-of-range index={targetIndex}");
+            isDragging = false;
+            draggedEntry = null;
+            dragTargetEntry = null;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        dragTargetEntry = entries[targetIndex];
+        await HandleDropCoreAsync();
+    }
+
+    private async Task HandleDropCoreAsync()
+    {
+        LogDragState("drop-before-validate");
         if (draggedEntry is null || dragTargetEntry is null || ReferenceEquals(draggedEntry, dragTargetEntry))
         {
-            HandleDragEnd();
+            LogDragState("drop-cancel-invalid-state");
+            isDragging = false;
+            draggedEntry = null;
+            dragTargetEntry = null;
+            await InvokeAsync(StateHasChanged);
             return;
         }
 
@@ -399,7 +469,11 @@ public partial class Home
         var targetIndex = entries.IndexOf(dragTargetEntry);
         if (draggedIndex < 0 || targetIndex < 0)
         {
-            HandleDragEnd();
+            LogDragState($"drop-cancel-index-missing draggedIndex={draggedIndex} targetIndex={targetIndex}");
+            isDragging = false;
+            draggedEntry = null;
+            dragTargetEntry = null;
+            await InvokeAsync(StateHasChanged);
             return;
         }
 
@@ -422,7 +496,34 @@ public partial class Home
         }
 
         EnsureTrailingEmptyRow();
-        HandleDragEnd();
+        LogDragState($"drop-committed draggedIndex={draggedIndex} targetIndex={targetIndex}");
+        isDragging = false;
+        draggedEntry = null;
+        dragTargetEntry = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void LogDragEvent(string stage, WorkLogEntry? entry, WebDragEventArgs? args)
+    {
+        var transfer = args?.DataTransfer;
+        var message =
+            $"[DND:{stage}] entryId={entry?.Id} project={entry?.Project ?? ""} story={entry?.Story ?? ""} task={entry?.Task ?? ""} " +
+            $"dropEffect={transfer?.DropEffect ?? ""} effectAllowed={transfer?.EffectAllowed ?? ""} " +
+            $"types={(transfer?.Types is null ? "" : string.Join(",", transfer.Types))}";
+
+        Console.WriteLine(message);
+        System.Diagnostics.Debug.WriteLine(message);
+        Logger.LogInformation(message);
+    }
+
+    private void LogDragState(string stage)
+    {
+        var message =
+            $"[DND-STATE:{stage}] draggedEntryId={draggedEntry?.Id} dragTargetEntryId={dragTargetEntry?.Id} entriesCount={entries.Count}";
+
+        Console.WriteLine(message);
+        System.Diagnostics.Debug.WriteLine(message);
+        Logger.LogInformation(message);
     }
 
     private string GetRowClass(WorkLogEntry entry)
@@ -872,5 +973,11 @@ public partial class Home
         }
 
         return $"{taskName} {normalizedLabel}";
+    }
+
+    public void Dispose()
+    {
+        dotNetRef?.Dispose();
+        dotNetRef = null;
     }
 }
