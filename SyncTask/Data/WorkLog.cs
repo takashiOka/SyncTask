@@ -20,4 +20,6 @@ public class WorkLog
     public string? StartTime { get; set; }
 
     public string? EndTime { get; set; }
+
+    public decimal? ManualWorkingHours { get; set; }
 }

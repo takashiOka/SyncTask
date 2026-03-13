@@ -1,3 +1,4 @@
+using System.Globalization;
 using SQLite;
 using SyncTask.Data;
 
@@ -30,7 +31,28 @@ public class DailyLogService
             return _database;
         }
 
-        var databasePath = Path.Combine(FileSystem.AppDataDirectory, "synctask.db3");
+        // プラットフォーム別の永続ストレージを使用
+        // パッケージ領域ではなく、ユーザー全体のローカルAppDataを取得
+        // 1. ベースとなる LocalAppData フォルダを取得
+        // (C:\Users\<ユーザー名>\AppData\Local を指す)
+        string baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+        // 2. 会社名とアプリ名を自由に決めて結合
+        // ここで指定した名前が そのままフォルダ名になります
+        string companyName = "Oka"; // あなたの苗字や屋号など
+        string appName = "SyncTask"; // アプリの識別名
+
+        // 3. パスを結合してディレクトリを作成
+        string targetDir = Path.Combine(baseDir, companyName, appName);
+
+        if (!Directory.Exists(targetDir))
+        {
+            Directory.CreateDirectory(targetDir);
+        }
+
+        // 4. SQLiteのファイル名を決定
+        string databasePath = Path.Combine(targetDir, "user_data.db3");
+
         _database = new SQLiteAsyncConnection(databasePath);
 
         await _database.CreateTableAsync<WorkLog>();
@@ -112,6 +134,11 @@ public class DailyLogService
         {
             await database.ExecuteAsync("ALTER TABLE WorkLog ADD COLUMN RedmineSyncMessage TEXT NULL");
         }
+
+        if (!columnNames.Contains("ManualWorkingHours"))
+        {
+            await database.ExecuteAsync("ALTER TABLE WorkLog ADD COLUMN ManualWorkingHours REAL NULL");
+        }
     }
 
     public async Task<WorkLog> GetOrCreateDailyLogAsync(DateTime workDate)
@@ -147,6 +174,15 @@ public class DailyLogService
         {
             await database.UpdateAsync(workLog);
         }
+    }
+
+    public async Task SaveAttendanceManualAsync(DateTime workDate, TimeSpan? startTime, TimeSpan? endTime, decimal? workingHours)
+    {
+        var workLog = await GetOrCreateDailyLogAsync(workDate.Date);
+        workLog.StartTime = startTime.HasValue ? startTime.Value.ToString(@"hh\:mm", CultureInfo.InvariantCulture) : null;
+        workLog.EndTime = endTime.HasValue ? endTime.Value.ToString(@"hh\:mm", CultureInfo.InvariantCulture) : null;
+        workLog.ManualWorkingHours = workingHours;
+        await SaveDailyLogAsync(workLog);
     }
 
     public async Task<List<WorkLogDateSummary>> GetWorkLogDateSummariesAsync(DateTime month)
@@ -202,6 +238,8 @@ public class DailyLogService
             .Where(log => log.WorkDate >= periodStartDate && log.WorkDate < endDateExclusive)
             .ToListAsync();
 
+        var workLogByDate = logs.ToDictionary(log => log.WorkDate.Date, log => log);
+
         var entriesByDate = new Dictionary<DateTime, List<WorkLogEntry>>();
 
         if (logs.Count > 0)
@@ -256,6 +294,32 @@ public class DailyLogService
             var workingHours = dayEntries
                 .Where(entry => !string.Equals(entry.Project, BreakProjectName, StringComparison.Ordinal))
                 .Sum(entry => entry.ActualHours);
+
+            if (workLogByDate.TryGetValue(cursor.Date, out var workLog))
+            {
+                var manualStartTime = ParseStoredTime(workLog.StartTime);
+                var manualEndTime = ParseStoredTime(workLog.EndTime);
+
+                if (manualStartTime.HasValue)
+                {
+                    startTime = manualStartTime;
+                }
+
+                if (manualEndTime.HasValue)
+                {
+                    endTime = manualEndTime;
+                }
+
+                if (workLog.ManualWorkingHours.HasValue)
+                {
+                    workingHours = Math.Max(0, workLog.ManualWorkingHours.Value);
+                }
+
+                if (manualStartTime.HasValue || manualEndTime.HasValue || workLog.ManualWorkingHours.GetValueOrDefault() > 0)
+                {
+                    hasAttendance = true;
+                }
+            }
 
             days.Add(new AttendanceDaySummary(
                 cursor.Date,
@@ -331,5 +395,22 @@ public class DailyLogService
         workLog.RedmineSyncedAt = status == RedmineSyncStatus.None ? null : DateTime.Now;
         workLog.RedmineSyncMessage = message ?? string.Empty;
         await database.UpdateAsync(workLog);
+    }
+
+    private static TimeSpan? ParseStoredTime(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = value.Trim();
+        var formats = new[] { @"hh\:mm", @"hh\:mm\:ss", @"h\:mm", @"h\:mm\:ss" };
+
+        return (TimeSpan.TryParseExact(normalized, formats, CultureInfo.InvariantCulture, out var parsed)
+            || TimeSpan.TryParse(normalized, CultureInfo.InvariantCulture, out parsed)
+            || TimeSpan.TryParse(normalized, CultureInfo.CurrentCulture, out parsed))
+            ? parsed
+            : null;
     }
 }

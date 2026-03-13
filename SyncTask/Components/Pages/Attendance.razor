@@ -13,6 +13,8 @@
         </div>
     </section>
 
+    <div class="daily-status glass-card">@PeriodLabel</div>
+
     @if (!string.IsNullOrWhiteSpace(statusMessage))
     {
         <div class="daily-status glass-card">@statusMessage</div>
@@ -29,18 +31,43 @@
                         <th>出勤時刻</th>
                         <th>退勤時刻</th>
                         <th>勤務時間合計</th>
+                        <th>保存</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var day in report.Days)
+                    @foreach (var day in editableDays)
                     {
                         <tr class="@GetDayRowClass(day.Date)">
                             <td>@day.Date.ToString("MM/dd")</td>
                             <td>@GetWeekdayLabel(day.Date)</td>
                             <td>@(day.HasAttendance ? "◯" : string.Empty)</td>
-                            <td>@FormatTime(day.StartTime)</td>
-                            <td>@FormatTime(day.EndTime)</td>
-                            <td>@FormatHours(day.WorkingHours)</td>
+                            <td>
+                                <input class="attendance-input"
+                                       type="time"
+                                       step="60"
+                                       value="@day.StartTimeInput"
+                                       @oninput="args => OnStartTimeInputChanged(day, args)" />
+                            </td>
+                            <td>
+                                <input class="attendance-input"
+                                       type="time"
+                                       step="60"
+                                       value="@day.EndTimeInput"
+                                       @oninput="args => OnEndTimeInputChanged(day, args)" />
+                            </td>
+                            <td>
+                                <input class="attendance-input attendance-input--hours"
+                                       type="number"
+                                       min="0"
+                                       step="0.25"
+                                       value="@day.WorkingHoursInput"
+                                       @oninput="args => OnWorkingHoursInputChanged(day, args)" />
+                            </td>
+                            <td>
+                                <button class="btn btn--ghost"
+                                        @onclick="() => SaveDayAsync(day)"
+                                        disabled="@day.IsSaving">保存</button>
+                            </td>
                         </tr>
                     }
                 </tbody>
@@ -48,8 +75,8 @@
         </div>
 
         <div class="attendance-sheet__summary">
-            <span class="daily-badge">実労働日数 @report.WorkingDays 日</span>
-            <span class="daily-badge">総労働時間 @FormatHours(report.TotalWorkingHours) h</span>
+            <span class="daily-badge">実労働日数 @WorkingDays 日</span>
+            <span class="daily-badge">総労働時間 @FormatHours(TotalWorkingHours) h</span>
         </div>
     </section>
 </div>

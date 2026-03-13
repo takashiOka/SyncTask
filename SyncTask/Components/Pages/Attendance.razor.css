@@ -67,6 +67,25 @@
   width: 72px;
 }
 
+.attendance-table th:nth-child(7),
+.attendance-table td:nth-child(7) {
+  width: 84px;
+}
+
+.attendance-input {
+  width: 100%;
+  max-width: 110px;
+  height: 2rem;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.82);
+  padding: 0 0.35rem;
+}
+
+.attendance-input--hours {
+  max-width: 92px;
+}
+
 .attendance-day--saturday td:nth-child(1),
 .attendance-day--saturday td:nth-child(2) {
   color: #1d4ed8;
