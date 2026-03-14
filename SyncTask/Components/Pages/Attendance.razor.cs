@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using SyncTask.Data;
 using SyncTask.Services;
 
@@ -9,6 +10,10 @@ public partial class Attendance
 {
     [Inject] private DailyLogService DailyLogService { get; set; } = default!;
     [Inject] private IHolidayService HolidayService { get; set; } = default!;
+    [Inject] private RedmineService RedmineService { get; set; } = default!;
+    [Inject] private AttendanceExcelService ExcelService { get; set; } = default!;
+    [Inject] private IFileSaveService FileSaveService { get; set; } = default!;
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
 
     private AttendanceMonthlyReport report = new(
         new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1),
@@ -21,6 +26,13 @@ public partial class Attendance
     private DateTime targetMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private string? statusMessage;
     private List<AttendanceEditableRow> editableDays = new();
+    private List<ProjectHourEntry> projectHours = new();
+    private bool isLoadingRedmine;
+    private bool isGenerating;
+    private bool isReminderDismissed;
+    private const string ReminderLocalStorageKey = "attendance_reminder_dismissed_month";
+
+    private bool ShowReminder => !isReminderDismissed && DateTime.Today.Day >= 21;
 
     private string TargetMonthInput => targetMonth.ToString("yyyy-MM", CultureInfo.InvariantCulture);
     private string PeriodLabel => $"{report.TargetMonth:yyyy年M月} 締め ({report.PeriodStartDate:MM/dd} ～ {report.PeriodEndDate:MM/dd})";
@@ -29,6 +41,10 @@ public partial class Attendance
 
     protected override async Task OnInitializedAsync()
     {
+        var dismissedMonth = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", ReminderLocalStorageKey);
+        var currentMonth = DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+        isReminderDismissed = dismissedMonth == currentMonth;
+
         await LoadReportAsync();
     }
 
@@ -57,8 +73,10 @@ public partial class Attendance
             HasAttendance = day.HasAttendance,
             StartTimeInput = ToTimeInput(day.StartTime),
             EndTimeInput = ToTimeInput(day.EndTime),
-            WorkingHoursInput = ToHoursInput(day.WorkingHours)
+            WorkingHoursInput = ToHoursInput(day.WorkingHours),
+            WorkingHours = day.WorkingHours
         }).ToList();
+        projectHours = new();
     }
 
     private async Task SaveDayAsync(AttendanceEditableRow day)
@@ -189,9 +207,80 @@ public partial class Attendance
         return time.HasValue ? time.Value.ToString("hh\\:mm", CultureInfo.InvariantCulture) : string.Empty;
     }
 
+    private async Task LoadRedmineHoursAsync()
+    {
+        isLoadingRedmine = true;
+        statusMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var settings = await DailyLogService.GetOrCreateRedmineSettingsAsync();
+            if (string.IsNullOrWhiteSpace(settings.BaseUrl) || string.IsNullOrWhiteSpace(settings.ApiKey))
+            {
+                statusMessage = "Redmineの設定が未入力です。設定画面でBaseURLとAPIキーを入力してください。";
+                return;
+            }
+
+            var entries = await RedmineService.GetTimeEntriesForPeriodAsync(
+                settings, report.PeriodStartDate, report.PeriodEndDate);
+
+            projectHours = entries
+                .Where(e => e.Project is not null)
+                .GroupBy(e => e.Project!.Name)
+                .Select(g => new ProjectHourEntry(g.Key, g.Sum(e => e.Hours)))
+                .OrderByDescending(e => e.Hours)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Redmine工数の取得に失敗しました: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingRedmine = false;
+        }
+    }
+
     private static string FormatHours(decimal hours)
     {
         return hours == 0 ? string.Empty : hours.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private async Task DismissReminder()
+    {
+        isReminderDismissed = true;
+        var currentMonth = DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", ReminderLocalStorageKey, currentMonth);
+    }
+
+    private async Task GenerateExcelAsync()
+    {
+        isGenerating = true;
+        statusMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            // 月変更直後などで projectHours が空の場合、生成前に最新を取得する。
+            if (projectHours.Count == 0)
+            {
+                await LoadRedmineHoursAsync();
+            }
+
+            var bytes = await ExcelService.GenerateAsync(report, projectHours);
+            var fileName = $"出勤簿_{targetMonth:yyyy_MM}.xlsx";
+            var saved = await FileSaveService.SaveFileAsync(fileName, bytes);
+            statusMessage = saved ? $"{fileName} を保存しました。" : null;
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"出勤簿の生成に失敗しました: {ex.Message}";
+        }
+        finally
+        {
+            isGenerating = false;
+        }
     }
 
     private sealed class AttendanceEditableRow
@@ -210,4 +299,5 @@ public partial class Attendance
 
         public bool IsSaving { get; set; }
     }
+
 }

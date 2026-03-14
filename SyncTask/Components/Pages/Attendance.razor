@@ -15,6 +15,17 @@
 
     <div class="daily-status glass-card">@PeriodLabel</div>
 
+    @if (ShowReminder)
+    {
+        <div class="attendance-reminder glass-card">
+            <span class="attendance-reminder__icon">🔔</span>
+            <span class="attendance-reminder__text">
+                今月は21日を過ぎています。<strong>出勤簿の出力</strong>をお忘れなく！
+            </span>
+            <button class="attendance-reminder__close" @onclick="DismissReminder" title="閉じる">×</button>
+        </div>
+    }
+
     @if (!string.IsNullOrWhiteSpace(statusMessage))
     {
         <div class="daily-status glass-card">@statusMessage</div>
@@ -42,14 +53,14 @@
                             <td>@GetWeekdayLabel(day.Date)</td>
                             <td>@(day.HasAttendance ? "◯" : string.Empty)</td>
                             <td>
-                                <input class="attendance-input"
+                                <input class="attendance-input attendance-input--time"
                                        type="time"
                                        step="60"
                                        value="@day.StartTimeInput"
                                        @oninput="args => OnStartTimeInputChanged(day, args)" />
                             </td>
                             <td>
-                                <input class="attendance-input"
+                                <input class="attendance-input attendance-input--time"
                                        type="time"
                                        step="60"
                                        value="@day.EndTimeInput"
@@ -77,6 +88,47 @@
         <div class="attendance-sheet__summary">
             <span class="daily-badge">実労働日数 @WorkingDays 日</span>
             <span class="daily-badge">総労働時間 @FormatHours(TotalWorkingHours) h</span>
+            <button class="btn btn--primary" @onclick="GenerateExcelAsync" disabled="@isGenerating">
+                @(isGenerating ? "生成中…" : "出勤簿生成")
+            </button>
         </div>
+    </section>
+
+    <section class="daily-card glass-card attendance-sheet">
+        <div class="attendance-redmine-header">
+            <h2 class="attendance-redmine-title">プロジェクト別工数（Redmine）</h2>
+            <button class="btn btn--ghost" @onclick="LoadRedmineHoursAsync" disabled="@isLoadingRedmine">
+                @(isLoadingRedmine ? "取得中…" : "Redmine工数を取得")
+            </button>
+        </div>
+
+        @if (projectHours.Count > 0)
+        {
+            <div class="attendance-project-table-wrap">
+                <table class="daily-log__table attendance-project-table">
+                    <thead>
+                        <tr>
+                            <th>プロジェクト</th>
+                            <th>工数 (h)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in projectHours)
+                        {
+                            <tr>
+                                <td class="attendance-project-name">@entry.ProjectName</td>
+                                <td>@entry.Hours.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="attendance-project-total">
+                            <td>合計</td>
+                            <td>@projectHours.Sum(e => e.Hours).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
     </section>
 </div>

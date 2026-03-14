@@ -136,6 +136,41 @@ public class RedmineService
         return statusMap;
     }
 
+    public async Task<List<RedmineTimeEntry>> GetTimeEntriesForPeriodAsync(
+        RedmineSettings settings,
+        DateTime from,
+        DateTime to,
+        CancellationToken cancellationToken = default)
+    {
+        var allEntries = new List<RedmineTimeEntry>();
+        var offset = 0;
+        const int limit = 100;
+
+        while (true)
+        {
+            var query = $"time_entries.json?user_id=me&from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&limit={limit}&offset={offset}";
+            using var request = BuildRequest(settings, query);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var payload = await response.Content.ReadFromJsonAsync<RedmineTimeEntriesResponse>(cancellationToken: cancellationToken);
+            if (payload?.TimeEntries is null || payload.TimeEntries.Count == 0)
+            {
+                break;
+            }
+
+            allEntries.AddRange(payload.TimeEntries);
+            offset += payload.Limit;
+
+            if (offset >= payload.TotalCount)
+            {
+                break;
+            }
+        }
+
+        return allEntries;
+    }
+
     private async Task RegisterSpentTimeAsync(
         RedmineSettings settings,
         RedmineTimeEntryDraft draft,
@@ -304,4 +339,31 @@ public sealed class RedmineTimeEntryCreateBody
 
     [JsonPropertyName("comments")]
     public string Comments { get; set; } = string.Empty;
+}
+
+public sealed class RedmineTimeEntriesResponse
+{
+    [JsonPropertyName("time_entries")]
+    public List<RedmineTimeEntry> TimeEntries { get; set; } = new();
+
+    [JsonPropertyName("total_count")]
+    public int TotalCount { get; set; }
+
+    [JsonPropertyName("offset")]
+    public int Offset { get; set; }
+
+    [JsonPropertyName("limit")]
+    public int Limit { get; set; }
+}
+
+public sealed class RedmineTimeEntry
+{
+    public int Id { get; set; }
+
+    public RedmineNamedValue? Project { get; set; }
+
+    public decimal Hours { get; set; }
+
+    [JsonPropertyName("spent_on")]
+    public string SpentOn { get; set; } = string.Empty;
 }

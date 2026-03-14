@@ -3,6 +3,45 @@
   gap: 1rem;
 }
 
+.attendance-reminder {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.22) 0%, rgba(245, 158, 11, 0.12) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  border-radius: 12px;
+  max-width: 880px;
+}
+
+.attendance-reminder__icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.attendance-reminder__text {
+  flex: 1;
+  font-size: 0.9rem;
+  color: #78350f;
+}
+
+.attendance-reminder__close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: #92400e;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.attendance-reminder__close:hover {
+  background: rgba(251, 191, 36, 0.3);
+}
+
 .attendance-hero {
   display: flex;
   align-items: center;
@@ -39,12 +78,27 @@
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
+  font-size: 0.85rem;
+}
+.attendance-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.281);
+  border-bottom: 2px solid rgba(148, 163, 184, 0.45);
+  padding: 0.8rem 0.5rem;
+  backdrop-filter: blur(4px);
+  font-weight: 600;
+  color: #0f172a;
+  text-align: center;
 }
 
 .attendance-table td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15); /* 白の透過度を下げる */
-  padding: 0.8rem 0.5rem; /* 出勤簿なので少しゆったりさせる */
-  backdrop-filter: blur(4px); /* セル自体にもわずかなボカシを入れると質感が上がる */
+  border-bottom: 1px solid rgba(148, 163, 184, 0.6);
+  padding: 0.3rem 0.2rem;
+  backdrop-filter: blur(
+    4px
+  ); /* セル自体にもわずかなボカシを入れると質感が上がる */
 }
 
 .attendance-table th,
@@ -82,8 +136,62 @@
   padding: 0 0.35rem;
 }
 
+.attendance-input--time {
+  font-family: inherit;
+  font-size: 0.8rem;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  background: rgba(255, 255, 255, 0.36);
+  color: #0f172a;
+  padding: 0.5rem 0;
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px) saturate(1.08);
+  -webkit-backdrop-filter: blur(10px) saturate(1.08);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.attendance-input--time:focus {
+  border-color: rgba(37, 99, 235, 0.46);
+  background: rgba(255, 255, 255, 0.48);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  outline: none;
+}
+
+.attendance-input--time::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
 .attendance-input--hours {
   max-width: 92px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  background: rgba(255, 255, 255, 0.36);
+  color: #0f172a;
+  padding: 0.5rem 0;
+  padding-left: 0.6rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px) saturate(1.08);
+  -webkit-backdrop-filter: blur(10px) saturate(1.08);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.attendance-input--hours:focus {
+  border-color: rgba(37, 99, 235, 0.46);
+  background: rgba(255, 255, 255, 0.48);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  outline: none;
 }
 
 .attendance-day--saturday td:nth-child(1),
@@ -102,7 +210,8 @@
   margin-top: 0.8rem;
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.9rem;
 }
 
 @media (max-width: 900px) {
@@ -114,4 +223,66 @@
   .attendance-sheet {
     max-width: 100%;
   }
+}
+
+.attendance-redmine-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.attendance-redmine-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.attendance-project-table-wrap {
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 12px;
+  width: 50%;
+  overflow: hidden;
+  padding: 0.5rem 0.5rem;
+}
+
+.attendance-project-table {
+  max-width: 480px;
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.attendance-project-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: center;
+}
+
+.attendance-project-table td {
+  padding: 0.4rem 0.5rem;
+}
+
+.attendance-project-table th:nth-child(1),
+.attendance-project-table td:nth-child(1) {
+  text-align: left;
+  padding-left: 0.75rem;
+  width: auto;
+}
+
+.attendance-project-table th:nth-child(2),
+.attendance-project-table td:nth-child(2) {
+  width: 120px;
+}
+
+.attendance-project-table td:nth-child(2) {
+  text-align: center;
+}
+
+.attendance-project-total td {
+  font-weight: 600;
+  border-top: 2px solid rgba(148, 163, 184, 0.45);
 }
