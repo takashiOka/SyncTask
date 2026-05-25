@@ -19,14 +19,14 @@ public partial class Attendance
         new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1),
         new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(-1).AddDays(20),
         new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddDays(19),
-        Array.Empty<AttendanceDaySummary>(),
+        [],
         0,
         0);
 
     private DateTime targetMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private string? statusMessage;
-    private List<AttendanceEditableRow> editableDays = new();
-    private List<ProjectHourEntry> projectHours = new();
+    private List<AttendanceEditableRow> editableDays = [];
+    private List<ProjectHourEntry> projectHours = [];
     private bool isLoadingRedmine;
     private bool isGenerating;
     private bool isReminderDismissed;
@@ -67,7 +67,7 @@ public partial class Attendance
     private async Task LoadReportAsync()
     {
         report = await DailyLogService.GetAttendanceMonthlyReportAsync(targetMonth);
-        editableDays = report.Days.Select(day => new AttendanceEditableRow
+        editableDays = [.. report.Days.Select(day => new AttendanceEditableRow
         {
             Date = day.Date,
             HasAttendance = day.HasAttendance,
@@ -75,8 +75,8 @@ public partial class Attendance
             EndTimeInput = ToTimeInput(day.EndTime),
             WorkingHoursInput = ToHoursInput(day.WorkingHours),
             WorkingHours = day.WorkingHours
-        }).ToList();
-        projectHours = new();
+        })];
+        projectHours = [];
     }
 
     private async Task SaveDayAsync(AttendanceEditableRow day)

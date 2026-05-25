@@ -175,7 +175,7 @@
 }
 
 .daily-log__table {
-    table-layout: fixed;
+    table-layout: auto;
     width: 100%;
     border-collapse: collapse;
     background: rgba(255, 255, 255, 0.72);
@@ -245,7 +245,8 @@
 /* 2. プロジェクト */
 .daily-log__table th:nth-child(2),
 .daily-log__table td:nth-child(2) {
-    min-width: 220px;
+    min-width: 120px;
+    width: auto;
 }
 
 /* 3. ストーリー / 4. タスク */
@@ -253,7 +254,8 @@
 .daily-log__table td:nth-child(3),
 .daily-log__table th:nth-child(4),
 .daily-log__table td:nth-child(4) {
-    min-width: 280px;
+    min-width: 120px;
+    width: auto;
 }
 
 .daily-log__table th:nth-child(5),

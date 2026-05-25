@@ -19,6 +19,7 @@ public partial class Home
 
     private const string MailBodyTemplateAssetPath = "report_template.txt";
     private const string DefaultMailBodyTemplate = "寺田様：\n\nお疲れ様です。岡です。\n\n${date}の作業報告をお送りいたします。\n\n■作業時間\n\n${worktime_section}\n\n■作業内容\n${content_section}\n\n■作業予定(${next_date})\n ●\n  ・";
+    private const string BeckyTemplatePath = @"D:\mail\Becky\53b27585.mb\#Tml\作業報告.tml";
     private const string BreakProjectOptionValue = "__BREAK_PRIVATE__";
     private const string BreakProjectName = "休憩・私用";
 
@@ -46,7 +47,6 @@ public partial class Home
         await LoadAsync();
         calendarMonth = new DateTime(workDate.Year, workDate.Month, 1);
         await LoadCalendarSummaryAsync();
-        await LoadProjectsAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -192,6 +192,8 @@ public partial class Home
         RecalculatePlannedStartTimesFrom(1);
         RecalculateActualStartTimesFrom(1);
         EnsureTrailingEmptyRow();
+        projectIssueCache.Clear();
+        await LoadProjectsAsync();
         await PreloadProjectIssuesAsync(entries);
     }
 
@@ -335,17 +337,26 @@ public partial class Home
             return;
         }
 
-        var subject = $"{workDate:MM/dd} 作業報告";
+        var subject = $"作業報告 {workDate:yyyy/MM/dd}";
 
         try
         {
-            var message = new EmailMessage
+            if (OperatingSystem.IsWindows())
             {
-                Subject = subject,
-                Body = generatedMailBody
-            };
+                var mailtoUri = BuildBeckyTemplateMailtoUri(subject, generatedMailBody);
+                await Launcher.Default.OpenAsync(mailtoUri);
+            }
+            else
+            {
+                var message = new EmailMessage
+                {
+                    Subject = subject,
+                    Body = generatedMailBody
+                };
 
-            await Email.Default.ComposeAsync(message);
+                await Email.Default.ComposeAsync(message);
+            }
+
             redmineStatusMessage = "メール作成画面を開きました。";
         }
         catch (FeatureNotSupportedException)
@@ -356,6 +367,15 @@ public partial class Home
         {
             redmineStatusMessage = $"メール作成画面を開けませんでした: {ex.Message}";
         }
+    }
+
+    private static string BuildBeckyTemplateMailtoUri(string subject, string body)
+    {
+        var encodedTemplatePath = Uri.EscapeDataString(BeckyTemplatePath);
+        var encodedSubject = Uri.EscapeDataString(subject);
+        var encodedBody = Uri.EscapeDataString(body);
+
+        return $"mailto:?X-Becky-Template={encodedTemplatePath}&subject={encodedSubject}&body={encodedBody}";
     }
 
     private async Task RegisterSpentTimeToRedmineAsync()
@@ -444,11 +464,6 @@ public partial class Home
 
     private async Task EnsureProjectIssuesLoadedAsync(int projectId)
     {
-        if (projectIssueCache.ContainsKey(projectId))
-        {
-            return;
-        }
-
         if (string.IsNullOrWhiteSpace(redmineSettings.BaseUrl) || string.IsNullOrWhiteSpace(redmineSettings.ApiKey))
         {
             return;

@@ -249,8 +249,7 @@
             <div class="daily-log__entry">
                 <button class="btn btn--primary" @onclick="GenerateMailBodyAsync">本文生成</button>
                 <button class="btn btn--ghost" @onclick="CopyMailBodyAsync" disabled="@string.IsNullOrWhiteSpace(generatedMailBody)">本文をコピー</button>
-                @* <button class="btn" @onclick="ComposeWorkReportMailAsync" disabled="@string.IsNullOrWhiteSpace(generatedMailBody)">メール作成</button> *@
-                <button class="btn btn--ghost" @onclick="ComposeWorkReportMailAsync" disabled="true">メール作成</button>
+                <button class="btn" @onclick="ComposeWorkReportMailAsync" disabled="@string.IsNullOrWhiteSpace(generatedMailBody)">メール作成</button>
             </div>
 
             @if (!string.IsNullOrWhiteSpace(generatedMailBody))
