@@ -6,21 +6,9 @@
   position: relative;
   display: grid;
   min-height: 100vh;
-  background:
-    radial-gradient(
-      circle at 10% 10%,
-      rgba(59, 130, 246, 0.14),
-      transparent 40%
-    ),
-    radial-gradient(
-      circle at 90% 0%,
-      rgba(236, 72, 153, 0.12),
-      transparent 36%
-    ),
-    #f4f7fb;
+  background: radial-gradient( circle at 10% 10%, rgba(59, 130, 246, 0.14), transparent 40% ), radial-gradient( circle at 90% 0%, rgba(236, 72, 153, 0.12), transparent 36% ), #f4f7fb;
   transition: grid-template-columns 0.25s ease;
-  font-family:
-    "BIZ UDPGothic", "Yu Gothic UI", "Segoe UI", "Hiragino Sans", sans-serif;
+  font-family: "BIZ UDPGothic", "Yu Gothic UI", "Segoe UI", "Hiragino Sans", sans-serif;
 }
 
 .app-shell--fixed {
@@ -46,9 +34,7 @@
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
-  transition:
-    background-color 0.16s ease,
-    transform 0.16s ease;
+  transition: background-color 0.16s ease, transform 0.16s ease;
 }
 
 .app-edge-toggle:hover {
@@ -72,9 +58,7 @@
   -webkit-backdrop-filter: blur(20px);
   color: #202020;
   overflow: hidden;
-  transition:
-    transform 0.25s ease,
-    opacity 0.25s ease;
+  transition: transform 0.25s ease, opacity 0.25s ease;
   z-index: 100;
 }
 
@@ -148,9 +132,7 @@
   color: #374151;
   cursor: pointer;
   font-size: 0.95rem;
-  transition:
-    background-color 0.16s ease,
-    transform 0.16s ease;
+  transition: background-color 0.16s ease, transform 0.16s ease;
 }
 
 .app-sidebar__pin:hover,
@@ -188,10 +170,7 @@
   background: transparent;
   border: 1px solid transparent;
   -webkit-backdrop-filter: blur(10px);
-  transition:
-    background-color var(--ui-transition),
-    color var(--ui-transition),
-    border-color var(--ui-transition);
+  transition: background-color var(--ui-transition), color var(--ui-transition), border-color var(--ui-transition);
   color: #2f2f2f;
 }
 
@@ -276,6 +255,16 @@
 
 .app-content__body {
   min-width: 0;
+}
+
+.app-version-stamp {
+  text-align: right;
+  padding: 16px 24px 8px 0;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  user-select: none;
 }
 
 @media (max-width: 900px) {

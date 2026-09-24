@@ -33,7 +33,7 @@ public class AttendanceExcelService
         AttendanceMonthlyReport report,
         IReadOnlyList<ProjectHourEntry> projectHours)
     {
-        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        ExcelPackage.License.SetNonCommercialPersonal("Takashi Oka");
 
         await using var templateStream = await FileSystem.OpenAppPackageFileAsync(TemplateName);
         using var package = new ExcelPackage(templateStream);

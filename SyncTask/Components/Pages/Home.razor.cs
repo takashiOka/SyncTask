@@ -27,10 +27,10 @@ public partial class Home
     private DateTime calendarMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private WorkLog? currentLog;
     private List<WorkLogEntry> entries = new();
-    private readonly Dictionary<DateTime, WorkLogDateSummary> calendarSummaryMap = new();
+    private readonly Dictionary<DateTime, WorkLogDateSummary> calendarSummaryMap = [];
     private SyncTask.Data.RedmineSettings redmineSettings = new();
-    private List<RedmineProject> redmineProjects = new();
-    private readonly Dictionary<int, RedmineIssueSplitResult> projectIssueCache = new();
+    private List<RedmineProject> redmineProjects = [];
+    private readonly Dictionary<int, RedmineIssueSplitResult> projectIssueCache = [];
     private bool isLoadingRedmine;
     private string? redmineStatusMessage;
     private string generatedMailBody = string.Empty;
@@ -39,7 +39,7 @@ public partial class Home
     private int? dragInsertIndex;
     private DotNetObjectReference<Home>? dotNetRef;
     private bool isCalendarPopupOpen;
-    private static readonly string[] CalendarDayLabels = { "日", "月", "火", "水", "木", "金", "土" };
+    private static readonly string[] CalendarDayLabels = ["日", "月", "火", "水", "木", "金", "土"];
 
     protected override async Task OnInitializedAsync()
     {
@@ -506,7 +506,7 @@ public partial class Home
             && !string.IsNullOrWhiteSpace(entry.Project)
             && redmineProjects.All(project => project.Id != entry.RedmineProjectId.Value))
         {
-            var merged = new List<RedmineProject>(redmineProjects.Count + 1)
+            List<RedmineProject> merged = new(redmineProjects.Count + 1)
             {
                 new RedmineProject
                 {
